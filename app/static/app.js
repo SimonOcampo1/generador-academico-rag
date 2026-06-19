@@ -115,6 +115,7 @@ async function toggleModel() {
 
 function body() {
   const spec = state.artefactos[$("#artefacto").value];
+  if (!spec) return null;  // opciones aún cargando (la 1ra vez se arma el corpus): evitar romper
   const r = { artefacto: $("#artefacto").value, tono: state.tono, rag: true };
   if (spec.alumno) r.alumno = $("#alumno").value;
   if (spec.objetivo) r.objetivo = $("#objetivo").value;
@@ -124,6 +125,8 @@ function body() {
 
 async function generar() {
   if (state.busy) return;
+  const req = body();
+  if (!req) { $("#hint").textContent = "Esperá a que terminen de cargar las opciones…"; return; }
   state.busy = true;
   const go = $("#go"); go.disabled = true; go.textContent = "Generando…";
   $("#hint").textContent = "";
@@ -134,7 +137,7 @@ async function generar() {
 
   try {
     const resp = await fetch("/api/generar_stream", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body()),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req),
     });
     const reader = resp.body.getReader(), dec = new TextDecoder();
     let buf = "";
@@ -149,7 +152,9 @@ async function generar() {
       }
     }
   } catch (e) {
-    $("#hint").textContent = "Error de conexión: " + e.message;
+    // distinguir un fallo real de red de un error del cliente (no confundir el diagnóstico)
+    const red = e instanceof TypeError && /fetch/i.test(e.message);
+    $("#hint").textContent = (red ? "Error de conexión: " : "Error: ") + e.message;
   } finally {
     state.busy = false; go.disabled = false; go.textContent = "Generar";
   }
@@ -158,7 +163,6 @@ async function generar() {
 function handle(ev) {
   if (ev.type === "meta") {
     $("#ctx").textContent = ev.contexto;
-    $("#ctxTag").textContent = "contexto: RAG (datos reales)";
     $("#srcTag").textContent = `${ev.model} · ${ev.tono}`;
   } else if (ev.type === "token") {
     $("#gen").textContent += ev.text;
