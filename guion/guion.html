@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Guión de presentación · Generador Académico RAG · Grupo 14</title>
+<link rel="stylesheet" href="../assets/design.css" />
+<style>
+  body { background: var(--bg); }
+  .page { max-width: 820px; margin: 0 auto; padding: var(--s6) var(--s4); }
+  .cover { border-bottom: 1px solid var(--line); padding-bottom: var(--s4); margin-bottom: var(--s5); }
+  .kick { font-family: var(--mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--cobalt); }
+  .cover h1 { font-size: clamp(30px, 4.5vw, 46px); margin: var(--s2) 0; }
+  .lede { font-size: 18px; color: var(--ink-soft); max-width: 62ch; }
+  .roster { margin-top: var(--s4); font-size: 14px; color: var(--ink-soft); line-height: 1.7; }
+  .roster strong { color: var(--ink); }
+  .roster .meta { font-family: var(--mono); font-size: 12px; color: var(--muted, #8B9099); margin-top: 10px; }
+
+  .turno { margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--line); }
+  .turno-head { display: flex; align-items: center; gap: 16px; }
+  .turno-num { font-family: var(--display); font-weight: 700; font-size: 22px; color: #fff; background: var(--cobalt); width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; }
+  .turno-head h2 { font-size: 26px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; margin: var(--s2) 0 var(--s3); }
+  .tag { font-family: var(--mono); font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--ink-soft); }
+  .tag.time { background: var(--cobalt-soft); border-color: transparent; color: var(--cobalt); }
+
+  .cue { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--cobalt); margin: var(--s3) 0 var(--s1); }
+  .speech p { font-size: 16px; line-height: 1.7; color: var(--ink); max-width: 68ch; }
+  .speech em { color: var(--cobalt); font-style: normal; font-weight: 500; }
+  .pause { font-family: var(--mono); font-size: 12px; color: var(--muted, #8B9099); }
+
+  .claves { background: var(--surface); border-radius: var(--r); padding: var(--s3) var(--s4); margin-top: var(--s4); }
+  .claves .h { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: var(--s2); }
+  .claves ul { margin: 0; padding-left: 20px; } .claves li { font-size: 15px; line-height: 1.6; margin: 8px 0; color: var(--ink); }
+  .handoff { margin-top: var(--s3); font-size: 15px; color: var(--ink-soft); border-top: 1px dashed var(--line); padding-top: var(--s2); }
+
+  @media print {
+    @page { margin: 18mm 17mm; }
+    .page { padding: 0; max-width: none; }
+    .cover { min-height: 86vh; display: flex; flex-direction: column; justify-content: center;
+             border-bottom: none; page-break-after: always; margin-bottom: 0; }
+    .cover h1 { font-size: 46px; }
+    .roster { margin-top: var(--s6); border-top: 1px solid var(--line); padding-top: var(--s4); }
+    .turno { break-inside: avoid; page-break-inside: avoid; }
+    .turno-head, .cue { page-break-after: avoid; }
+    .claves { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <section class="cover">
+    <span class="kick">Guión de presentación</span>
+    <h1>Generador Académico RAG</h1>
+    <p class="lede">Speech seccionado por integrante para la exposición. Cada parte sirve también
+      como material de estudio: lo que decís y lo que te pueden preguntar.</p>
+    <div class="roster">
+      <strong>Grupo 14</strong> · Ciencia de Datos · UTN FRLP<br />
+      Martin, Tomás · Gentil, Mora · Natalichio, Santiago · Cuenca, Juan Bautista ·
+      Ocampo, Simón · Aubert, Lautaro
+      <div class="meta">6 turnos · 10 diapositivas · Duración objetivo: 18 a 24 minutos</div>
+    </div>
+  </section>
+
+  <!-- TURNO 1 -->
+  <section class="turno">
+    <div class="turno-head"><span class="turno-num">1</span><h2>Martin, Tomás</h2></div>
+    <div class="tags"><span class="tag">Apertura + problema</span><span class="tag">Slides 1–2</span><span class="tag time">≈ 3 min</span></div>
+
+    <div class="cue">Slide 1 · Apertura</div>
+    <div class="speech">
+      <p>Buenas a todos. Somos el Grupo 14 y nuestro proyecto se llama
+        <em>Generador Académico RAG</em>. Arranco con una pregunta: <span class="pause">[pausa]</span>
+        ¿qué pasa si le pedimos a una IA "armame el plan del próximo cuatrimestre"? Si solo sabe
+        lo genérico de internet, no puede: no conoce <strong>tus</strong> notas, <strong>tus</strong>
+        correlativas, <strong>tu</strong> avance. Eso es justo lo que resolvimos.</p>
+
+      <div class="cue">Slide 2 · El problema</div>
+      <p>Y acá la primera aclaración importante, porque es la crítica que nos íbamos a comer:
+        "che, eso lo hace un SQL". Y es verdad… <em>si</em> el producto fueran consultas tipo
+        "¿qué nota tengo en Bases de Datos?". Eso es <strong>lookup</strong>, buscar un dato, no
+        es IA generativa.</p>
+      <p>Nuestro reencuadre fue ese: el producto no son respuestas, son <strong>artefactos nuevos
+        generados</strong> (un plan justificado, un informe, una carta de pasantía). El SQL te
+        dice qué <em>podés</em> cursar; nuestro sistema te dice qué <em>conviene</em> y por qué,
+        redactado. Y tampoco es NotebookLM: la gracia del TP es que el pipeline RAG lo
+        <strong>construimos nosotros</strong> y lo mostramos. Mis compañeros lo van desarmando.</p>
+    </div>
+    <div class="claves">
+      <div class="h">Claves para estudiar / si te preguntan</div>
+      <ul>
+        <li><b>Qué hace:</b> genera artefactos académicos (planes, informes, cartas) anclados en el historial real del grupo y el plan de estudios.</li>
+        <li><b>"Lo hace un SQL":</b> no, un SQL hace lookup; nosotros generamos texto nuevo con razonamiento y tono.</li>
+        <li><b>"Es NotebookLM":</b> no, construimos el pipeline RAG (chunking, embeddings, vector DB, retrieval) en vez de usar una caja negra.</li>
+      </ul>
+    </div>
+    <p class="handoff">Cierre: "Para generar bien, primero hay que tener buenos datos. Mora les cuenta con qué trabajamos." → pasa a <strong>Mora</strong>.</p>
+  </section>
+
+  <!-- TURNO 2 -->
+  <section class="turno">
+    <div class="turno-head"><span class="turno-num">2</span><h2>Gentil, Mora</h2></div>
+    <div class="tags"><span class="tag">Datos · corpus · EDA</span><span class="tag">Slide 3</span><span class="tag time">≈ 3 min</span></div>
+
+    <div class="cue">Slide 3 · Datos y exploración</div>
+    <div class="speech">
+      <p>Gracias, Tomás. El corazón del proyecto son los datos, y son <strong>privados</strong>:
+        el modelo no los conoce. Armamos un corpus de <strong>418 documentos</strong> a partir de
+        PDFs reales: los estados académicos y exports de notas de <strong>los seis integrantes</strong>
+        del grupo, más el Plan de Sistemas 2023 con todas las correlatividades.</p>
+      <p>Lo interesante es que el corpus es <em>mixto</em>: combinamos lo <strong>estructurado</strong>
+        (cada materia con su nota y su año) con lo <strong>no estructurado</strong> (el texto del
+        plan). El desafío técnico más grande fue el <em>join</em>: los códigos de materia no
+        coinciden entre el estado y el plan, así que unimos por el <strong>nombre normalizado</strong>,
+        sin tildes ni mayúsculas. Parseamos las 36 obligatorias con sus correlativas.</p>
+      <p>Sobre eso hicimos el EDA: son <strong>199 notas reales</strong> de los seis, con promedios
+        parejos entre <strong>7.9 y 8.7</strong>. Las diferencias verdaderas aparecen al
+        desagregar por área temática, y eso es justo lo que después explota el diagnóstico grupal.</p>
+    </div>
+    <div class="claves">
+      <div class="h">Claves para estudiar / si te preguntan</div>
+      <ul>
+        <li><b>Corpus:</b> 418 docs (362 de estados, 36 correlativas, 20 chunks del plan).</li>
+        <li><b>Por qué normalizar:</b> los códigos institucionales no coinciden entre documentos; el nombre normalizado es la clave de join.</li>
+        <li><b>EDA:</b> 199 notas reales de los 6 integrantes, promedios 7.9–8.7; se compara por área temática.</li>
+        <li><b>Equivalencias 2008↔2023:</b> el export de notas usa nombres del Plan 2008; los canonizamos al 2023 (Anexo II) para no perder notas por equivalencia.</li>
+      </ul>
+    </div>
+    <p class="handoff">Cierre: "Con esos datos limpios, Santi les muestra cómo los convertimos en algo que el modelo puede consultar." → pasa a <strong>Santiago</strong>.</p>
+  </section>
+
+  <!-- TURNO 3 -->
+  <section class="turno">
+    <div class="turno-head"><span class="turno-num">3</span><h2>Natalichio, Santiago</h2></div>
+    <div class="tags"><span class="tag">Pipeline RAG · embeddings</span><span class="tag">Slides 4–5</span><span class="tag time">≈ 4 min</span></div>
+
+    <div class="cue">Slide 4 · El pipeline RAG</div>
+    <div class="speech">
+      <p>Gracias, Mora. Acá está el núcleo del trabajo. RAG significa <em>Retrieval-Augmented
+        Generation</em>: en vez de pedirle al modelo que sepa todo, le <strong>recuperamos</strong>
+        el contexto justo y se lo damos para que genere sobre eso.</p>
+      <p>El flujo: los PDFs pasan por <strong>pdfplumber</strong> a texto, los convertimos en
+        documentos, los vectorizamos con <strong>MiniLM</strong> (embeddings) y los guardamos en
+        <strong>Chroma</strong>, la base vectorial. Cuando llega un pedido, recuperamos los
+        documentos más relevantes y se los pasamos a <strong>qwen2.5</strong> corriendo local con
+        Ollama. Todo offline y privado.</p>
+      <p>Un detalle que nos importó: tenemos <strong>dos modos de recuperación</strong>. El
+        <em>semántico</em>, por similitud de embeddings, para lenguaje natural; y el
+        <em>determinístico</em>, por metadata, para anclar exactamente las materias aprobadas de
+        un alumno. Ese segundo modo es el que garantiza que no se inventen notas.</p>
+
+      <div class="cue">Slide 5 · El espacio semántico</div>
+      <p>¿Y cómo sabemos que los embeddings funcionan? Proyectamos las 36 materias con
+        <strong>t-SNE</strong> y se ve que las de la misma área caen juntas. Eso valida que el
+        espacio capturó la estructura del plan, y es lo que habilita el recomendador por
+        <em>matching semántico</em>: cruzar dónde te fue bien con materias afines. Eso un SQL no
+        lo puede hacer; necesita similitud sobre texto.</p>
+    </div>
+    <div class="claves">
+      <div class="h">Claves para estudiar / si te preguntan</div>
+      <ul>
+        <li><b>RAG:</b> recuperar contexto relevante y dárselo al modelo para que genere anclado, en vez de confiar en su memoria.</li>
+        <li><b>Embeddings:</b> all-MiniLM-L6-v2, local; Chroma como vector DB persistente.</li>
+        <li><b>Retrieval semántico vs. determinístico:</b> uno por similitud (lenguaje natural), otro por metadata (grounding exacto).</li>
+        <li><b>t-SNE:</b> valida que materias de la misma área quedan cercanas en el espacio.</li>
+      </ul>
+    </div>
+    <p class="handoff">Cierre: "Ya tenemos el contexto. Juan les muestra qué hacemos con él: generar." → pasa a <strong>Juan Bautista</strong>.</p>
+  </section>
+
+  <!-- TURNO 4 -->
+  <section class="turno">
+    <div class="turno-head"><span class="turno-num">4</span><h2>Cuenca, Juan Bautista</h2></div>
+    <div class="tags"><span class="tag">Generación · prompting · tonos</span><span class="tag">Slide 6</span><span class="tag time">≈ 3 min</span></div>
+
+    <div class="cue">Slide 6 · Un dato, tres tonos</div>
+    <div class="speech">
+      <p>Gracias, Santi. Tenemos seis generadores: plan de cursada, informe de trayectoria, carta
+        de pasantía, recomendación de orientación, diagnóstico grupal y simulación what-if. Todos
+        comparten la misma regla de prompting: el modelo usa <strong>exclusivamente</strong> el
+        contexto recuperado y tiene prohibido inventar notas o materias.</p>
+      <p>Pero lo que lo hace <em>generativo</em> de verdad es el <strong>control de tono</strong>.
+        Miren la slide: el mismo dato, "podés cursar Ciencia de Datos", dicho en tres registros.
+        En <em>técnico</em> es seco y preciso. En <em>motivacional</em> te destaca el logro. En
+        <em>honesto</em> te marca también la debilidad sin vueltas.</p>
+      <p>Los datos son idénticos, salen del mismo contexto. Lo único que cambia es cómo se redacta.
+        Eso es exactamente lo que un reporte fijo o un SQL no pueden darte: es síntesis de texto,
+        no una consulta.</p>
+    </div>
+    <div class="claves">
+      <div class="h">Claves para estudiar / si te preguntan</div>
+      <ul>
+        <li><b>6 artefactos:</b> plan, informe, carta, orientación, diagnóstico grupal, what-if.</li>
+        <li><b>Anti-alucinación:</b> el system prompt obliga a usar solo el contexto y a no inventar.</li>
+        <li><b>Tono:</b> técnico / motivacional / honesto sobre los mismos datos; es un control de producto, no estético.</li>
+      </ul>
+    </div>
+    <p class="handoff">Cierre: "¿Y cómo demostramos que esto realmente usa los datos y no chamuya? Simón lo mide en vivo." → pasa a <strong>Simón</strong>.</p>
+  </section>
+
+  <!-- TURNO 5 -->
+  <section class="turno">
+    <div class="turno-head"><span class="turno-num">5</span><h2>Ocampo, Simón</h2></div>
+    <div class="tags"><span class="tag">Demo con/sin RAG · evaluación</span><span class="tag">Slides 7–8</span><span class="tag time">≈ 4 min</span></div>
+
+    <div class="cue">Slide 7 · Con RAG vs. sin RAG (demo en vivo)</div>
+    <div class="speech">
+      <p>Gracias, Juan. Esta es nuestra demo estrella, y la voy a correr en vivo en la web app.
+        El mismo pedido, un plan de cursada, con un botón: <strong>con RAG</strong> y
+        <strong>sin RAG</strong>.</p>
+      <p>Con RAG, miren la consola: a la izquierda aparece el contexto que recuperó de la base
+        vectorial, las materias y notas reales, y a la derecha el modelo genera el plan citando
+        esos datos. Sin RAG, le sacamos el contexto: el modelo no tiene de dónde agarrarse, así
+        que se generaliza o directamente inventa materias que no existen.</p>
+
+      <div class="cue">Slide 8 · Cómo lo medimos</div>
+      <p>Y esto no es impresión nuestra, lo <strong>medimos</strong>, con dos métricas. El
+        <em>grounding léxico</em>: qué fracción de los datos de la salida (nombres de materias,
+        notas) aparecen literalmente en el contexto. Anclada da cerca de <strong>1.0</strong>;
+        inventada, cerca de <strong>0.0</strong>. Y como el léxico castiga la paráfrasis legítima,
+        sumamos un <em>grounding semántico</em>: similitud de embeddings entre la salida y el
+        contexto. Las dos métricas juntas separan lo anclado de lo inventado sin penalizar que el
+        modelo reformule.</p>
+    </div>
+    <div class="claves">
+      <div class="h">Claves para estudiar / si te preguntan</div>
+      <ul>
+        <li><b>Demo:</b> mismo input, con/sin contexto; muestra que el valor está en el dato privado.</li>
+        <li><b>Grounding léxico:</b> fracción de tokens informativos de la salida presentes en el contexto (0 a 1).</li>
+        <li><b>Grounding semántico:</b> coseno de embeddings salida↔contexto; reconoce paráfrasis que el léxico penaliza.</li>
+        <li><b>Resultado validación:</b> anclada ≈ 1.0 (léxico), inventada ≈ 0.0.</li>
+        <li><b>Resultado demo (3 artefactos):</b> grounding léxico cae de <b>0.74 con RAG a 0.32 sin RAG</b>; semántico 0.61 → 0.52.</li>
+        <li><b>Limitación restante:</b> miden cercanía con el contexto, no consistencia lógica; no detectan contradicciones sutiles.</li>
+        <li><b>Si falla la demo en vivo:</b> mostrar la celda equivalente del notebook.</li>
+      </ul>
+    </div>
+    <p class="handoff">Cierre: "Más allá de un alumno, esto sirve para todo el grupo. Lautaro cierra con eso." → pasa a <strong>Lautaro</strong>.</p>
+  </section>
+
+  <!-- TURNO 6 -->
+  <section class="turno">
+    <div class="turno-head"><span class="turno-num">6</span><h2>Aubert, Lautaro</h2></div>
+    <div class="tags"><span class="tag">Diagnóstico · conclusiones · cierre</span><span class="tag">Slides 9–10</span><span class="tag time">≈ 3 min</span></div>
+
+    <div class="cue">Slide 9 · Diagnóstico grupal</div>
+    <div class="speech">
+      <p>Gracias, Simón. Para cerrar el lado de análisis: aplicamos <strong>KMeans</strong> sobre
+        el perfil por área de cada integrante y lo proyectamos con PCA. Eso agrupa a la gente por
+        fortalezas afines, y el generador de diagnóstico grupal usa esos clusters para
+        <em>repartir roles</em> de un proyecto, con justificación. Es el pipeline de Ciencia de
+        Datos completo: EDA, visualización, clustering, todo conectado al RAG.</p>
+
+      <div class="cue">Slide 10 · Conclusiones</div>
+      <p>¿Qué demostramos? Cuatro cosas. Una: construimos un pipeline RAG completo, no una caja
+        negra. Dos: el sistema <strong>genera</strong> artefactos con tono, no responde preguntas.
+        Tres: la demo con/sin RAG hace <strong>medible</strong> el valor del conocimiento privado.
+        Y cuatro: hicimos el pipeline de DS entero, de los datos crudos a la evaluación.</p>
+      <p>Todo esto está en el notebook, el informe, y la web app que vieron funcionando.
+        Muchas gracias. Quedamos para las preguntas.</p>
+    </div>
+    <div class="claves">
+      <div class="h">Claves para estudiar / si te preguntan</div>
+      <ul>
+        <li><b>Clustering:</b> KMeans sobre perfil por área (estandarizado), PCA para visualizar.</li>
+        <li><b>Cierre del valor:</b> pipeline propio + generación + evaluación medible + DS completo.</li>
+        <li><b>"¿Para qué sirve fuera del TP?":</b> cualquier estudiante podría generar su plan/carta/informe sobre su propio historial.</li>
+      </ul>
+    </div>
+    <p class="handoff">Fin de la exposición. Reparto de preguntas: técnicas de pipeline → Santiago; datos → Mora; evaluación → Simón.</p>
+  </section>
+
+</div>
+</body>
+</html>

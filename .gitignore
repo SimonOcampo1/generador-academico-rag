@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+data/chroma/
+
+# Datos ajenos al pipeline: el Excel de conformación de grupos trae nombres/emails de
+# estudiantes de otros grupos. No lo usa el sistema y no debe versionarse.
+data/raw/*.xlsx
+Conformacion de Grupos*.xlsx

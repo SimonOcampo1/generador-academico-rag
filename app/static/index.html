@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Generador Académico RAG · demo en vivo</title>
+<link rel="stylesheet" href="/assets/design.css">
+<style>
+  html, body { height: 100%; }
+  body { height: 100dvh; overflow: hidden; display: grid; grid-template-rows: auto 1fr;
+    transition: background .3s var(--ease), color .3s var(--ease); }
+
+  /* topbar slim */
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--s3);
+    padding: 12px clamp(18px, 3vw, 32px); border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 11px; font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: -.02em; }
+  .brand .mark { width: 26px; height: 26px; border-radius: 8px; background: var(--cobalt); position: relative; flex: none; }
+  .brand .mark::after { content: ""; position: absolute; inset: 7px; border-radius: 3px; background: var(--bg); }
+  .brand b { color: var(--cobalt); }
+  .controls-top { display: flex; align-items: center; gap: 12px; }
+  .status { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--ink-soft); }
+  .dot { width: 9px; height: 9px; border-radius: 999px; background: var(--steel); transition: background .3s; }
+  .dot.up { background: var(--teal); box-shadow: 0 0 0 4px color-mix(in srgb, var(--teal) 18%, transparent); }
+  .icon-btn { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink); cursor: pointer; font-size: 16px; transition: border-color .2s, transform .15s var(--ease); }
+  .icon-btn:hover { border-color: var(--steel); } .icon-btn:active { transform: translateY(1px); }
+
+  /* stage: dos columnas, alto completo */
+  .stage { min-height: 0; display: grid; grid-template-columns: 360px 1fr; gap: clamp(16px, 2vw, 26px);
+    padding: clamp(16px, 2.4vw, 26px) clamp(18px, 3vw, 32px); }
+  @media (max-width: 900px) { body { overflow: auto; height: auto; } .stage { grid-template-columns: 1fr; } }
+
+  /* rail (izquierda) */
+  .rail { min-height: 0; display: flex; flex-direction: column; gap: clamp(11px, 1.6vh, 16px); padding-right: 4px; overflow-y: auto; }
+  .rail .intro h1 { font-size: clamp(20px, 2.1vw, 26px); line-height: 1.1; letter-spacing: -.02em; }
+  .rail .intro h1 .accent { color: var(--cobalt); }
+  .rail .intro p { font-size: 13px; margin: 7px 0 0; }
+  .field { display: flex; flex-direction: column; }
+  .field.hidden { display: none; }
+  .seg { display: flex; width: fit-content; }
+  .tono-pills { flex-wrap: wrap; }
+  .go-row { display: flex; gap: 10px; align-items: center; }
+  .hint { font-size: 12.5px; color: var(--ink-soft); }
+
+  /* output (derecha) — ocupa todo el alto */
+  .output { min-height: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; }
+  .output .head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); padding: 13px 16px; border-bottom: 1px solid var(--line); }
+  .output .meta { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
+  .views { flex: 1; min-height: 0; position: relative; }
+  .view { position: absolute; inset: 0; padding: clamp(18px, 2vw, 30px); overflow: auto; }
+  .view[hidden] { display: none; }
+  .console { background: var(--console-bg); min-height: 100%; }
+  .artifact { font-size: clamp(15px, 1.5vw, 17px); line-height: 1.75; color: var(--ink); white-space: pre-wrap; max-width: 80ch; margin: 0 auto; }
+  .artifact.placeholder { color: var(--ink-soft); }
+  .output .foot { padding: 11px 16px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 12px; color: var(--ink-soft); display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+  .ground-inline { display: flex; align-items: center; gap: 10px; }
+  .ground-inline.hidden { display: none; }
+  .ground-inline .gbar { width: 120px; }
+  .ground-inline .gval { font-family: var(--display); font-weight: 600; font-size: 15px; color: var(--ink); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="mark"></span>Generador Académico <b>RAG</b></div>
+  <div class="controls-top">
+    <div class="status"><span class="dot" id="dot"></span><span id="ollamaTxt">verificando…</span></div>
+    <button class="icon-btn no-print" id="toggleModel" title="Encender/apagar modelo">⏻</button>
+    <button class="icon-btn no-print" id="toggleTheme" title="Cambiar tema">◐</button>
+  </div>
+</header>
+
+<main class="stage">
+  <!-- RAIL -->
+  <aside class="rail">
+    <div class="intro">
+      <p class="eyebrow" style="margin-bottom:8px">Pipeline RAG en vivo</p>
+      <h1>De tu historial a <span class="accent">decisiones</span>.</h1>
+      <p class="muted">Generá un artefacto y mirá el contexto real que lo ancla, token por token.</p>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="artefacto">Artefacto</label>
+      <select id="artefacto"></select>
+    </div>
+    <div class="field" id="alumnoField">
+      <label class="lbl" for="alumno">Alumno</label>
+      <select id="alumno"></select>
+    </div>
+    <div class="field">
+      <label class="lbl">Tono</label>
+      <div class="pills tono-pills" id="tonoSeg" role="group" aria-label="Tono"></div>
+    </div>
+    <div class="field hidden" id="objetivoField">
+      <label class="lbl" for="objetivo">Objetivo (carta)</label>
+      <input type="text" id="objetivo" value="una pasantía en Ciencia de Datos">
+    </div>
+    <div class="field hidden" id="whatifField">
+      <label class="lbl">Escenario what-if</label>
+      <div class="row" style="gap:10px">
+        <input type="text" id="wifMateria" value="Ciencia de Datos" style="flex:1">
+        <input type="number" id="wifNota" min="4" max="10" value="9" style="width:74px">
+      </div>
+    </div>
+    <div class="go-row">
+      <button class="btn btn--primary" id="go">Generar</button>
+      <span class="hint" id="hint"></span>
+    </div>
+  </aside>
+
+  <!-- OUTPUT -->
+  <section class="output">
+    <div class="head">
+      <div class="pills" id="viewPills" role="tablist">
+        <button data-view="artifact" aria-selected="true" role="tab">Artefacto generado</button>
+        <button data-view="ctx" aria-selected="false" role="tab">Contexto recuperado</button>
+      </div>
+      <span class="meta" id="srcTag"></span>
+    </div>
+    <div class="views">
+      <div class="view" id="viewArtifact" role="tabpanel">
+        <div class="artifact placeholder" id="gen">El artefacto generado aparecerá acá, token por token. Elegí las opciones a la izquierda y presioná Generar.</div>
+      </div>
+      <div class="view" id="viewCtx" role="tabpanel" hidden>
+        <div class="console" id="ctx">Acá se muestra lo que recupera la base vectorial para anclar la generación.</div>
+      </div>
+    </div>
+    <div class="foot">
+      <span id="stats">listo para generar</span>
+      <div class="ground-inline hidden" id="groundBox" title="Cuánto de la salida cita datos reales del contexto">
+        <span class="eyebrow" style="margin:0">Grounding</span>
+        <div class="gbar" id="gbar"><span style="width:0"></span></div>
+        <span class="gval" id="gval">—</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

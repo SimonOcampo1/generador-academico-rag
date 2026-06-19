@@ -1,0 +1,11 @@
+pdfplumber
+chromadb
+requests
+fastapi
+uvicorn
+pandas
+matplotlib
+scikit-learn
+nbformat
+nbconvert
+ipykernel

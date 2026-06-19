@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Informe Técnico — Generador Académico RAG · Grupo 14</title>
+<link rel="stylesheet" href="../assets/design.css">
+<style>
+  body { background: var(--bg); }
+  .doc { max-width: 820px; margin: 0 auto; padding: var(--s6) var(--s4); }
+  .doc > section { margin-top: var(--s6); }
+  .cover { text-align: left; border-bottom: 1px solid var(--line); padding-bottom: var(--s4); }
+  .cover h1 { font-size: clamp(38px, 6vw, 56px); margin: var(--s2) 0; }
+  .doc p { text-align: justify; text-justify: inter-word; hyphens: auto; }
+  .lede { font-size: 20px; line-height: 1.5; color: var(--ink); max-width: 64ch; text-align: left; hyphens: none; }
+  blockquote { text-align: left; }
+  .meta { display: flex; flex-wrap: wrap; gap: var(--s3) var(--s4); margin-top: var(--s4); font-size: 14px; color: var(--ink-soft); }
+  .meta b { color: var(--ink); font-weight: 600; }
+  h2 { margin-bottom: var(--s2); padding-top: var(--s2); }
+  h2 .n { font-family: var(--mono); font-size: 15px; color: var(--cobalt); margin-right: 12px; font-weight: 500; }
+  h3 { margin: var(--s4) 0 var(--s1); }
+  figure { margin: var(--s4) 0; }
+  figure img { width: 100%; border: 1px solid var(--line); border-radius: var(--r); }
+  figcaption { font-size: 13px; color: var(--ink-soft); margin-top: 10px; font-family: var(--mono); }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s3); margin: var(--s4) 0; }
+  .kpi { border-top: 2px solid var(--cobalt); padding-top: var(--s2); }
+  .kpi b { font-family: var(--display); font-size: 30px; display: block; line-height: 1; }
+  .kpi span { font-size: 12px; color: var(--ink-soft); }
+  pre { background: var(--ink); color: #D9DCE3; padding: var(--s3); border-radius: var(--r); overflow:auto; font-family: var(--mono); font-size: 13px; line-height: 1.6; }
+  blockquote { margin: var(--s3) 0; padding-left: var(--s3); border-left: 2px solid var(--line); color: var(--ink-soft); font-style: italic; }
+  @media (max-width: 640px) { .kpis { grid-template-columns: 1fr 1fr; } }
+  @media print {
+    @page { margin: 18mm 17mm; }
+    .doc { padding: 0; max-width: none; }
+    /* Portada a página completa, centrada, con su propio salto de página */
+    .cover { min-height: 88vh; display: flex; flex-direction: column; justify-content: center;
+             border-bottom: none; page-break-after: always; }
+    .cover h1 { font-size: 52px; }
+    .cover .lede { font-size: 19px; }
+    .cover .meta { margin-top: var(--s6); border-top: 1px solid var(--line); padding-top: var(--s4); }
+    section { page-break-inside: auto; }
+    h2 { page-break-after: avoid; }
+    figure, .kpis, blockquote, pre { page-break-inside: avoid; }
+    figcaption { page-break-before: avoid; }
+  }
+</style>
+</head>
+<body>
+<article class="doc">
+
+  <header class="cover">
+    <p class="eyebrow">Informe Técnico · TP Integrador de Ciencia de Datos · UTN FRLP 2026</p>
+    <h1>Generador Académico <span class="cobalt">RAG</span></h1>
+    <p class="lede">Un sistema de IA generativa que sintetiza artefactos académicos
+      personalizados anclados en el historial real del grupo y el plan de estudios, mediante un
+      pipeline RAG construido de punta a punta.</p>
+    <div class="meta">
+      <span><b>Grupo 14</b> · Martin, Gentil, Natalichio, Cuenca, Ocampo, Aubert</span>
+      <span><b>Pipeline</b> · pdfplumber → MiniLM → Chroma → qwen2.5 (Ollama)</span>
+      <span><b>Entorno</b> · local, offline, privado</span>
+    </div>
+  </header>
+
+  <section>
+    <h2><span class="n">01</span>Planificación y metodología</h2>
+    <p>El objetivo es construir un sistema de IA generativa que, alimentado por una base
+      vectorial con el historial académico del grupo más la documentación de la carrera,
+      <b>genere artefactos académicos personalizados</b>: planes de cursada justificados,
+      informes de trayectoria, cartas de pasantía, recomendaciones de orientación, diagnóstico
+      grupal y simulaciones what-if.</p>
+    <p>El reencuadre central del proyecto fue pasar de un <i>asistente de preguntas</i> (que un
+      SQL o NotebookLM resolverían) a un <b>generador</b>: cada salida es texto nuevo
+      sintetizado, con razonamiento y estilo, no un campo de una tabla. Un SQL responde qué
+      materias <i>podés</i> cursar; este sistema redacta qué <i>conviene</i> y por qué,
+      cruzando notas, correlativas y patrón de rendimiento.</p>
+    <p>La metodología siguió el pipeline de Ciencia de Datos completo: ingesta y preprocesamiento
+      de un corpus mixto, vectorización, análisis exploratorio, visualización, clustering,
+      generación con control de tono y evaluación cuantitativa del anclaje (grounding).</p>
+    <div class="kpis">
+      <div class="kpi"><b>418</b><span>documentos en el corpus</span></div>
+      <div class="kpi"><b>36</b><span>correlatividades parseadas</span></div>
+      <div class="kpi"><b>6</b><span>generadores de artefactos</span></div>
+      <div class="kpi"><b>3</b><span>tonos controlables</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">02</span>Datos, EDA y preprocesamiento</h2>
+    <p>El corpus combina lo <b>estructurado</b> (notas, años y correlatividades) con lo
+      <b>no estructurado</b> (chunks del plan de estudios). Las fuentes son PDFs reales:
+      los estados académicos y exports de exámenes de los <b>seis integrantes del grupo</b>, y el
+      Plan de Sistemas 2023 (correlatividades del Anexo I y equivalencias del Anexo II).</p>
+    <p>El preprocesamiento crítico fue el <b>join entre el estado académico y el plan</b>: los
+      códigos institucionales no coinciden entre documentos, así que la clave de unión es el
+      <i>nombre de materia normalizado</i> (minúsculas, sin tildes ni puntuación). Se parsearon
+      las 36 obligatorias con sus correlativas, resolviendo casos borde como las integradoras,
+      cuyo nombre se parte en dos líneas. El corpus final tiene 418 documentos: 362 de estados
+      académicos, 36 de correlatividades y 20 chunks del plan.</p>
+    <p>El historial de notas de exámenes usa los nombres del <b>Plan 2008</b>, mientras que el
+      estado académico ya migró a los del <b>Plan 2023</b>. Para que el cruce no pierda notas
+      aprobadas por equivalencia, incorporamos el <b>Anexo II</b> del plan (régimen de
+      equivalencias 2008↔2023) como tabla de canonización de nombres: toda materia se lleva a su
+      nombre 2023 antes del join, con tolerancia a la truncación de nombres largos del PDF. Tras
+      esa normalización, las materias que quedan sin nota numérica son las de nivelación de
+      ingreso (año 0, sin nota) y las aún no cursadas, como corresponde.</p>
+    <p>El análisis exploratorio trabaja sobre <b>199 registros reales</b> de notas (una entrada por
+      materia aprobada con calificación numérica), correspondientes a los seis integrantes. Los
+      promedios van de <b>7.9 a 8.7</b>, un grupo parejo y de buen rendimiento; las diferencias
+      aparecen al desagregar por área temática, que es lo que explota el diagnóstico grupal.</p>
+    <figure>
+      <img src="../figs/notas_distribucion.png" alt="Distribución de notas por integrante">
+      <figcaption>Fig. 1 — Distribución de notas por integrante (datos reales de los seis): promedios entre 7.9 y 8.7.</figcaption>
+    </figure>
+    <figure>
+      <img src="../figs/avance_anual.png" alt="Avance académico por año">
+      <figcaption>Fig. 2 — Avance académico real por año: materias aprobadas por integrante.</figcaption>
+    </figure>
+    <figure>
+      <img src="../figs/radar_areas.png" alt="Perfil por área temática">
+      <figcaption>Fig. 3 — Perfil por área temática. Las 36 obligatorias se agrupan en 6 áreas para comparar fortalezas.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2><span class="n">03</span>Pipeline RAG e implementación</h2>
+    <p>El pipeline se construyó en módulos independientes, cada uno con self-checks:</p>
+    <pre>extract.py    PDF → texto (pdfplumber)
+documents.py  texto → documentos + correlatividades; normalizar() = clave de join
+ingest.py     corpus → Chroma; buscar() semántico + obtener() por metadata
+rag.py        chat() al LLM local (qwen2.5 vía Ollama); fallback si está apagado
+analisis.py   DataFrame de notas reales (6 integrantes) + agregaciones por área
+figuras.py    EDA, radar, clustering (KMeans/PCA), t-SNE de embeddings
+generar.py    6 generadores de artefactos con control de tono
+evaluar.py    grounding léxico + semántico + comparar_con_sin_rag()</pre>
+    <p>La vectorización usa <b>all-MiniLM-L6-v2</b> (el embedding por defecto de Chroma, local y
+      offline). El retrieval tiene dos modos: <b>semántico</b> (similitud de embeddings, para
+      lenguaje natural) y <b>determinístico</b> (por metadata, para anclar exactamente las
+      materias aprobadas de un alumno y las correlatividades). La generación corre sobre
+      <b>qwen2.5 vía Ollama</b>; si Ollama está apagado, la parte RAG sigue funcionando y
+      devuelve el contexto recuperado.</p>
+
+    <h3>Estrategia de prompting</h3>
+    <p>El sistema instruye al modelo a usar <b>exclusivamente</b> el contexto recuperado y a no
+      inventar notas, materias ni correlatividades. El prompt entrega el contexto como datos
+      citables y una tarea concreta por artefacto. El <b>control de tono</b> (técnico,
+      motivacional, honesto) reescribe el mismo dato en distinto registro: es lo que hace al
+      sistema generativo y no un reporte fijo.</p>
+    <blockquote>"Generás artefactos personalizados usando exclusivamente los datos del contexto.
+      No inventes notas ni materias; si un dato no está en el contexto, no lo afirmes."</blockquote>
+  </section>
+
+  <section>
+    <h2><span class="n">04</span>Clustering y espacio semántico</h2>
+    <p>Sobre el perfil por área (estandarizado) se aplicó <b>KMeans</b> y se proyectó a 2D con
+      PCA para visualizar grupos de perfiles afines. Por separado, se proyectaron las 36
+      obligatorias con <b>t-SNE sobre sus embeddings</b>: las materias de la misma área caen
+      juntas, lo que valida que el espacio semántico capturó la estructura del plan, condición
+      necesaria para que el recomendador por matching semántico funcione.</p>
+    <figure>
+      <img src="../figs/clustering_perfiles.png" alt="Clustering de perfiles">
+      <figcaption>Fig. 4 — Clustering de perfiles académicos (KMeans sobre perfil por área, proyección PCA).</figcaption>
+    </figure>
+    <figure>
+      <img src="../figs/materias_embeddings.png" alt="Materias en el espacio semántico">
+      <figcaption>Fig. 5 — Las 36 obligatorias en el espacio semántico (t-SNE de embeddings), coloreadas por área.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2><span class="n">05</span>Evaluación: grounding con/sin RAG</h2>
+    <p>Medimos el anclaje con <b>dos métricas complementarias</b>. El <b>grounding léxico</b> es la
+      fracción de tokens informativos de la salida (nombres de materias y notas numéricas) que
+      aparecen literalmente en el contexto: explicable, pero penaliza la paráfrasis. El
+      <b>grounding semántico</b> promedia el máximo coseno entre cada oración de la salida y los
+      fragmentos del contexto (mismos embeddings MiniLM): reconoce la reformulación legítima que el
+      léxico castiga. En la validación, una afirmación anclada obtuvo grounding léxico <b>1.0</b>
+      (semántico 0.69) y una inventada <b>0.0</b> (semántico 0.34): ambas métricas separan lo
+      anclado de lo inventado.</p>
+    <p>La <b>demo estrella</b> compara el mismo pedido <b>con RAG</b> (contexto real) contra
+      <b>sin RAG</b> (sin contexto). Sin el conocimiento privado, el modelo no puede anclar: se
+      generaliza o inventa, y el grounding cae. Promediando tres artefactos (plan de cursada,
+      recomendación de orientación e informe de trayectoria), el grounding léxico pasa de
+      <b>0.74 con RAG a 0.32 sin RAG</b> &mdash;menos de la mitad&mdash; y el semántico de
+      <b>0.61 a 0.52</b>. La brecha léxica es la más elocuente: sin el contexto, la salida casi
+      no menciona materias ni notas reales. Es la evidencia medible de que el aporte del pipeline
+      no es cosmético sino el corazón del producto.</p>
+    <div class="kpis">
+      <div class="kpi"><b>0.74</b><span>grounding léxico CON RAG</span></div>
+      <div class="kpi"><b>0.32</b><span>grounding léxico SIN RAG</span></div>
+      <div class="kpi"><b>0.61</b><span>grounding semántico CON RAG</span></div>
+      <div class="kpi"><b>0.52</b><span>grounding semántico SIN RAG</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">06</span>Análisis crítico y conclusiones</h2>
+    <p>El sistema cumple el objetivo: construimos el pipeline RAG completo (no una caja negra) y
+      lo usamos para <b>generar</b>, no para responder. La demo con/sin RAG y el grounding
+      hacen visible y medible el valor del conocimiento privado.</p>
+    <h3>Limitaciones</h3>
+    <p>El grounding, aun en su versión semántica, no detecta <i>contradicciones</i> sutiles: mide
+      cercanía con el contexto, no consistencia lógica con él. El recomendador por matching se
+      apoya en nombres de materias y correlativas, no en las descripciones reales de cada cátedra.
+      Y el modelo local (qwen2.5 3B) prioriza reproducibilidad offline sobre calidad de redacción:
+      es honesto y anclado, pero su prosa es más simple que la de un modelo grande.</p>
+    <h3>Trabajo futuro</h3>
+    <p>Incorporar las descripciones de cátedras y electivas al corpus para que el recomendador
+      compare contenidos y no solo nombres; sumar al grounding una verificación de consistencia
+      (detección de contradicciones, no solo de cercanía); y ofrecer una corrida opcional con un
+      modelo más grande (p. ej. qwen2.5 7B en una máquina con GPU), dejando el 3B como fallback
+      offline reproducible.</p>
+    <p class="muted" style="margin-top:var(--s4)">El código, el notebook integrador y la web app
+      de demostración en vivo acompañan este informe como entregables ejecutables.</p>
+  </section>
+
+</article>
+</body>
+</html>
