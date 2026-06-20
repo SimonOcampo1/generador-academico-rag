@@ -1,0 +1,51 @@
+ENTREGA - Grupo 14 - Generador Academico RAG
+Ciencia de Datos - UTN FRLP 2026
+
+QUE ES
+------
+Sistema de IA generativa (RAG) que, a partir del historial academico real del
+grupo + el plan de estudios de la carrera, genera artefactos academicos
+personalizados (planes de cursada, informes, cartas, recomendaciones, etc.).
+No responde preguntas: sintetiza documentos nuevos anclados en datos privados.
+
+
+COMO CORRER LA NOTEBOOK
+-----------------------
+La notebook corre de principio a fin SIN GPU y SIN internet: si no hay un modelo
+local (Ollama) disponible, el pipeline RAG (extraccion, corpus, embeddings,
+Chroma, retrieval, EDA, figuras, clustering y metricas lexica/factual) corre
+igual en modo "solo-retrieval". Lo unico que requiere LLM es la GENERACION del
+texto de los artefactos. Los datos estan incluidos en data/raw/.
+
+OPCION A - Local (recomendada para corregir, no necesita GPU)
+   1) Pararse en esta carpeta y crear el entorno:
+        python -m venv .venv
+        .venv\Scripts\activate         (Windows)  |  source .venv/bin/activate (Linux/Mac)
+        pip install -r requirements.txt
+   2) Abrir y ejecutar:
+        jupyter notebook notebook.ipynb
+   La notebook ya viene EJECUTADA de punta a punta (con el modelo qwen2.5:14b):
+   se puede abrir y ver todas las salidas sin correr nada.
+
+   Generacion en vivo (opcional): instalar Ollama (https://ollama.com) y
+        ollama pull qwen2.5:14b-instruct
+   Con Ollama corriendo, la notebook genera los artefactos con el modelo.
+
+OPCION B - Google Colab (para ver la generacion con el 14b en GPU gratis)
+   1) Ir a https://colab.research.google.com -> Archivo -> Subir cuaderno ->
+      elegir notebook.ipynb (esta dentro de este zip; descomprimirlo antes).
+   2) Entorno de ejecucion -> Cambiar tipo de entorno -> GPU T4 -> Guardar.
+   3) Entorno de ejecucion -> Ejecutar todo.
+   La 2da celda detecta que esta en Colab y pide subir este .zip: elegirlo y se
+   descomprime solo (no hay que editar nada). Despues la celda de setup instala
+   las dependencias, levanta Ollama y baja qwen2.5:14b en la GPU (la descarga del
+   modelo ~9 GB tarda unos minutos la primera vez).
+
+
+CONTENIDO
+   notebook.ipynb     notebook integradora, ejecutada de punta a punta
+   src/               modulos de la solucion (importados por la notebook)
+   data/raw/          PDFs reales (estados academicos + notas + plan de estudios)
+   data/eval_resultados.json   metricas agregadas de la evaluacion con/sin RAG
+   requirements.txt   dependencias
+   README.md          documentacion del proyecto

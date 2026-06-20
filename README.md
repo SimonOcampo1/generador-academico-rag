@@ -167,11 +167,18 @@ corrés los scripts. Colab solo mueve el cómputo; el modelo 7b en GPU responde 
 
 ### Notebook integrador en Colab (autocontenida)
 
-`notebook.ipynb` corre de punta a punta en Google Colab **sin configuración extra**: subí la
-carpeta del proyecto a tu Drive, abrila con Colab (*Entorno de ejecución → GPU T4*) y *Ejecutar
-todo*. La celda 0 instala dependencias, levanta `qwen2.5` en la GPU de Colab y corre el pipeline
-completo (corpus → Chroma → retrieval → generación → evaluación con las 4 métricas). Si no hay
-GPU, degrada a modo solo-retrieval sin romperse.
+`notebook.ipynb` **ya viene ejecutada de punta a punta**: se puede abrir y revisar todas las
+salidas (tablas, figuras, artefactos, métricas) sin correr nada.
+
+Para reproducirla en Google Colab: subí `notebook.ipynb`, elegí *Entorno de ejecución → GPU T4*
+y *Ejecutar todo*. La 2ª celda detecta Colab y pide subir el zip de la entrega
+(`Entrega-Grupo14-GeneradorAcademico.zip`); lo descomprime sola, sin editar nada. Después la celda
+de setup instala dependencias, levanta `qwen2.5:14b-instruct` en la GPU y corre el pipeline
+completo (corpus → Chroma → retrieval → generación → evaluación con las 4 métricas).
+
+Es **completamente funcional sin GPU**: si no hay modelo disponible, el pipeline RAG (extracción,
+embeddings, Chroma, retrieval, EDA, clustering y métricas) corre igual en modo solo-retrieval; lo
+único que requiere GPU es la generación del texto del LLM.
 
 ---
 
