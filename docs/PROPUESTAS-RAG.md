@@ -10,7 +10,7 @@
 
 ## Lo que se reutiliza (sirve para las 4)
 
-- **Modelo local**: Ollama + `qwen2.5:3b-instruct` (el que ya tenemos). Corre en la PC, sin GPU.
+- **Modelo local**: Ollama + `phi4-mini` (3.8B). Corre en la PC, sin GPU.
 - **Frontend**: FastAPI + la web app con la "consola en vivo" (se ve el prompt real + respuesta token a token). Ideal para la demo.
 - **Embeddings**: `sentence-transformers` (MiniLM) que ya usábamos para el recomendador.
 - **Evaluación**: módulo de métricas (grounding, coherencia) ya existente.
@@ -19,7 +19,7 @@
 ## Lo que se agrega (el núcleo nuevo, igual para las 4)
 
 ```
-documentos → chunking → embeddings (MiniLM) → Chroma (vector DB) → retrieval top-k → qwen2.5 → respuesta citada
+documentos → chunking → embeddings (MiniLM) → Chroma (vector DB) → retrieval top-k → Phi-4-mini → respuesta citada
 ```
 
 - **Chroma** como base vectorial (liviana, local, `pip install`).

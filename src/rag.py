@@ -1,8 +1,8 @@
 """RAG: recupera contexto de Chroma y genera la respuesta con el LLM local.
 
-Flujo: consulta -> retrieval (ingest.buscar) -> prompt con contexto -> qwen2.5 vía Ollama.
+Flujo: consulta -> retrieval (ingest.buscar) -> prompt con contexto -> Phi-4-mini vía Ollama.
 Si Ollama no está corriendo, devuelve el contexto recuperado (la parte RAG funciona igual).
-Mismo modelo local que el proyecto de notas de cata: OLLAMA_MODEL, default qwen2.5:3b-instruct.
+Modelo local configurable por OLLAMA_MODEL; default phi4-mini (3.8B).
 """
 from __future__ import annotations
 
@@ -13,9 +13,9 @@ import requests
 from ingest import buscar
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-# Default 1.5b: equilibrio velocidad/calidad en CPU con poca RAM (8 GB). En una máquina con GPU,
-# exportá OLLAMA_MODEL=qwen2.5:7b-instruct para mejor redacción sin penalizar tiempo. Ver README.
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "qwen2.5:1.5b-instruct")
+# Default phi4-mini (3.8B): mejor redacción y grounding léxico que modelos más chicos, sigue
+# corriendo en CPU. En una máquina con GPU se puede exportar un modelo más grande. Ver README.
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "phi4-mini")
 # Mantener el modelo cargado entre pedidos evita el costo de recarga en cada generación.
 OLLAMA_KEEP_ALIVE = os.environ.get("OLLAMA_KEEP_ALIVE", "30m")
 
@@ -33,18 +33,27 @@ def ollama_disponible() -> bool:
         return False
 
 
-def chat(system: str, user: str, temperature: float = 0.4, num_predict: int = 400) -> str | None:
-    """Una respuesta del LLM local. None si Ollama no está disponible (modo fallback).
+# Opciones de generación compartidas por la web y por chat() para que las salidas sean idénticas.
+# num_predict: tope de longitud. 400 cortaba a mitad de oración los artefactos narrativos; pero con
+# modelos chicos un tope alto los hace DIVAGAR/loopear en vez de aportar. 512 deja terminar la prosa
+# sin darle cuerda para repetirse.
+# repeat_penalty 1.15 (>1.1 default) desalienta el reinicio literal del texto en modelos chicos.
+NUM_PREDICT = int(os.environ.get("OLLAMA_NUM_PREDICT", "512"))
+REPEAT_PENALTY = float(os.environ.get("OLLAMA_REPEAT_PENALTY", "1.15"))
 
-    num_predict acota la longitud de salida: clave en CPU, donde una respuesta sin tope puede
-    tardar minutos. 400 tokens alcanzan para los artefactos y mantienen la demo ágil.
-    """
+
+def gen_options(temperature: float = 0.4, num_predict: int = NUM_PREDICT) -> dict:
+    return {"temperature": temperature, "num_predict": num_predict, "repeat_penalty": REPEAT_PENALTY}
+
+
+def chat(system: str, user: str, temperature: float = 0.4, num_predict: int = NUM_PREDICT) -> str | None:
+    """Una respuesta del LLM local. None si Ollama no está disponible (modo fallback)."""
     if not ollama_disponible():
         return None
     r = requests.post(
         f"{OLLAMA_URL}/api/chat",
         json={"model": OLLAMA_MODEL, "stream": False, "keep_alive": OLLAMA_KEEP_ALIVE,
-              "options": {"temperature": temperature, "num_predict": num_predict},
+              "options": gen_options(temperature, num_predict),
               "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},
         timeout=300,
     )

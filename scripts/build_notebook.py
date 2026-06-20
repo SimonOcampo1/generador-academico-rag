@@ -31,7 +31,7 @@ texto nuevo sintetizado, no un campo de una tabla.
 ```
 PDFs ──pdfplumber──▶ documentos (estructurado + no estructurado)
      ──MiniLM──▶ embeddings ──▶ Chroma (base vectorial)
-     ──retrieval top-k──▶ contexto ──▶ qwen2.5 (Ollama) ──▶ artefacto
+     ──retrieval top-k──▶ contexto ──▶ Phi-4-mini (Ollama) ──▶ artefacto
 ```
 Local, offline, privado. Si Ollama está apagado, la parte RAG funciona igual (recupera el
 contexto) y la generación se completa al encender el modelo.

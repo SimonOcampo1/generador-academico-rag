@@ -9,3 +9,7 @@ data/chroma/
 # estudiantes de otros grupos. No lo usa el sistema y no debe versionarse.
 data/raw/*.xlsx
 Conformacion de Grupos*.xlsx
+
+# Artefactos temporales de pruebas/logs (no son entregables)
+scripts/_*
+*.log

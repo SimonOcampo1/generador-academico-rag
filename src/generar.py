@@ -12,7 +12,7 @@ Tono controlable: mismo dato, distinto registro -> esto es lo que lo hace genera
 from __future__ import annotations
 
 import analisis
-from documents import normalizar
+from documents import canon
 from ingest import buscar, obtener
 from rag import chat
 
@@ -40,10 +40,6 @@ def _correlativas() -> list[dict]:
     return obtener({"fuente": "correlatividades"})
 
 
-def _ctx(docs: list[dict]) -> str:
-    return "\n".join(f"- {d['text']}" for d in docs)
-
-
 def _ctx_aprobadas_compacto(docs: list[dict]) -> str:
     """Aprobadas en una línea por materia ('Materia (nota, año N)'), no la prosa verbosa.
 
@@ -57,14 +53,65 @@ def _ctx_aprobadas_compacto(docs: list[dict]) -> str:
     )
 
 
+def _ctx_estado_rico(docs: list[dict]) -> str:
+    """Como el compacto pero con el código de materia: más strings concretos para anclar.
+
+    Saca el ruido (Tomo/Folio/horas del PDF) pero conserva código + nota + año, que es lo que el
+    modelo copia para mantenerse anclado en datos reales (sube el grounding sin ensuciar la prosa).
+    """
+    filas = sorted(docs, key=lambda d: (d["metadata"]["anio"], d["metadata"]["materia"]))
+    return "\n".join(
+        f"- {d['metadata']['materia']} (código {d['metadata']['codigo']}, "
+        f"nota {d['metadata']['nota']}, año {d['metadata']['anio']})"
+        for d in filas
+    )
+
+
+def _cursables(alumno: str) -> list[dict]:
+    """Materias que el alumno YA puede cursar, derivadas del grafo de correlatividades.
+
+    Retrieval determinístico (parte del método RAG, no un atajo): una materia es cursable si
+    NO está aprobada y TODAS sus correlativas 'para cursar' (Anexo I del plan) ya están aprobadas.
+    Devuelve, por materia, qué correlativas la habilitan (para que el modelo justifique sobre datos
+    reales, no sobre suposiciones). La priorización y la prosa las genera el modelo.
+    """
+    aprob_canon = {canon(d["metadata"]["materia"]) for d in _aprobadas(alumno)}
+    corr = _correlativas()
+    num_a_nombre = {int(d["metadata"]["num_plan"]): d["metadata"]["materia"] for d in corr}
+    aprob_nums = {n for n, nom in num_a_nombre.items() if canon(nom) in aprob_canon}
+    cursables: list[dict] = []
+    for d in corr:
+        md = d["metadata"]
+        if canon(md["materia"]) in aprob_canon:
+            continue  # ya aprobada: no es candidata a cursar
+        req = [int(x) for x in md["cursar"].split(",") if x]
+        if all(n in aprob_nums for n in req):  # todas las correlativas para cursarla, cumplidas
+            cursables.append({
+                "materia": md["materia"], "num": int(md["num_plan"]),
+                "habilitada_por": [num_a_nombre.get(n, f"materia {n}") for n in req],
+            })
+    return sorted(cursables, key=lambda c: c["num"])
+
+
 def _contexto_plan(alumno: str) -> str:
-    """Contexto mínimo para el plan: aprobadas compactas + correlativas SOLO de lo no aprobado."""
+    """Contexto del plan: rendimiento real + materias cursables ya verificadas vs el plan."""
     aprob = _aprobadas(alumno)
-    ya = {normalizar(d["metadata"]["materia"]) for d in aprob}
-    pendientes = [d for d in _correlativas() if normalizar(d["metadata"]["materia"]) not in ya]
+    cursables = _cursables(alumno)
+    if cursables:
+        filas = "\n".join(
+            f"- {c['materia']}"
+            + (f" (habilitada por: {', '.join(c['habilitada_por'])})" if c["habilitada_por"]
+               else " (sin correlativas para cursar)")
+            for c in cursables
+        )
+    else:
+        filas = "- (no hay materias nuevas habilitadas con las correlativas actuales)"
     return (
-        f"MATERIAS APROBADAS por {alumno}:\n{_ctx_aprobadas_compacto(aprob)}\n\n"
-        f"CORRELATIVIDADES de las materias que aún NO aprobó:\n{_ctx(pendientes)}"
+        f"RENDIMIENTO de {alumno} (materias aprobadas con su nota y año):\n"
+        f"{_ctx_aprobadas_compacto(aprob)}\n\n"
+        f"MATERIAS QUE {alumno} YA PUEDE CURSAR el próximo cuatrimestre "
+        f"(verificado contra las correlatividades del plan: todas las correlativas para cursarlas "
+        f"ya están aprobadas):\n{filas}"
     )
 
 
@@ -83,16 +130,18 @@ def _generar(system: str, contexto: str, instruccion: str, temperatura: float = 
 def plan_cursada(alumno: str, tono: str = "tecnico") -> dict:
     contexto = _contexto_plan(alumno)
     instr = (
-        f"Armá el plan de cursada del próximo cuatrimestre para {alumno}. Listá qué materias "
-        "PUEDE cursar (correlativas para cursar ya cumplidas según las aprobadas del contexto) y "
-        "cuáles conviene PRIORIZAR, justificando en prosa con su rendimiento y las correlativas. "
+        f"Armá el plan de cursada del próximo cuatrimestre para {alumno}. Usá EXCLUSIVAMENTE el "
+        "listado 'MATERIAS QUE YA PUEDE CURSAR' del contexto (ya verificado contra el plan): NO "
+        "incluyas materias fuera de ese listado ni materias ya aprobadas. De ese listado, recomendá "
+        "en prosa cuáles conviene PRIORIZAR y por qué, justificando con su rendimiento (las áreas y "
+        "notas donde mejor le va) y con las correlativas que cada una habilita hacia adelante. "
         f"{TONOS.get(tono, '')}"
     )
     return {"artefacto": "plan_cursada", "alumno": alumno, "tono": tono, **_generar(_SYSTEM, contexto, instr)}
 
 
 def informe_trayectoria(alumno: str, tono: str = "motivacional") -> dict:
-    contexto = _ctx(_aprobadas(alumno))
+    contexto = _ctx_estado_rico(_aprobadas(alumno))
     instr = (
         f"Escribí un informe narrativo de la trayectoria académica de {alumno}: evolución por año, "
         "fortalezas y debilidades por área, y un consejo final. Apoyate en notas y materias reales. "
@@ -102,7 +151,7 @@ def informe_trayectoria(alumno: str, tono: str = "motivacional") -> dict:
 
 
 def carta_pasantia(alumno: str, objetivo: str = "una pasantía en Ciencia de Datos", tono: str = "tecnico") -> dict:
-    contexto = _ctx(_aprobadas(alumno))
+    contexto = _ctx_estado_rico(_aprobadas(alumno))
     instr = (
         f"Redactá una carta de motivación de {alumno} para {objetivo}. Seleccioná y destacá las "
         "materias y notas del contexto más relevantes al objetivo. Formato carta, 2-3 párrafos. "
@@ -117,7 +166,8 @@ def recomendar_orientacion(alumno: str, tono: str = "tecnico") -> dict:
     mejores = sorted(_aprobadas(alumno), key=lambda d: d["metadata"]["nota"], reverse=True)[:6]
     consulta = " ".join(d["metadata"]["materia"] for d in mejores)
     vecinas = buscar(consulta, k=6, where={"fuente": "correlatividades"})
-    contexto = _ctx(mejores) + "\n\nMaterias semánticamente afines a sus fortalezas:\n" + \
+    contexto = "Materias donde mejor rindió:\n" + _ctx_aprobadas_compacto(mejores) + \
+        "\n\nMaterias semánticamente afines a sus fortalezas:\n" + \
         "\n".join(f"- {h['text']}" for h in vecinas)
     instr = (
         f"Recomendá una orientación/perfil profesional para {alumno} a partir de las materias donde "

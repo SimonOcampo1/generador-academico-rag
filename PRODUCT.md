@@ -25,7 +25,7 @@ entregables de comunicación (informe, slides, guión) comparten el mismo sistem
 ## What it does
 - Ingesta corpus mixto: estructurado (notas, años, correlativas) + no estructurado (plan).
 - Pipeline RAG propio: PDFs → pdfplumber → documentos → embeddings MiniLM → Chroma →
-  retrieval top-k → qwen2.5 vía Ollama (fallback a solo-retrieval si Ollama apagado).
+  retrieval top-k → Phi-4-mini vía Ollama (fallback a solo-retrieval si Ollama apagado).
 - 6 generadores de artefactos con **tono controlable** (técnico / motivacional / honesto).
 - EDA + visualización + clustering de perfiles (KMeans, t-SNE de embeddings).
 - Evaluación de **grounding** y **demo estrella con RAG / sin RAG**.

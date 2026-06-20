@@ -28,7 +28,7 @@ respuestas concretas y citadas. El RAG no es un adorno: es el corazón del siste
 
 ```
 PDFs (plan + estados académicos) → extracción → documentos → embeddings (MiniLM)
-   → Chroma (vector DB) → retrieval top-k → qwen2.5 (Ollama) → respuesta citada
+   → Chroma (vector DB) → retrieval top-k → Phi-4-mini (Ollama) → respuesta citada
 ```
 
 El estado académico se convierte en **un documento por materia** (hecho atómico); el plan se
@@ -45,7 +45,7 @@ src/
   extract.py      PDF → texto (pdfplumber)
   documents.py    texto → documentos (estado: 1 por materia · plan: chunks)
   ingest.py       documentos → embeddings → Chroma + búsqueda semántica
-  rag.py          retrieval → qwen2.5 (Ollama) → respuesta
+  rag.py          retrieval → Phi-4-mini (Ollama) → respuesta
   analisis.py     DataFrame de notas reales (6 integrantes) + agregaciones por área (EDA)
   figuras.py      EDA, radar, clustering (KMeans/PCA), t-SNE de embeddings → figs/
   generar.py      6 generadores de artefactos con control de tono
@@ -93,7 +93,7 @@ python scripts/export_pdf.py # informe + slides + guión a PDF (Edge/Chrome head
 Modelo local (recomendado para la generación):
 
 ```bash
-ollama pull qwen2.5:1.5b-instruct
+ollama pull phi4-mini
 ollama serve
 ```
 
@@ -102,26 +102,27 @@ ollama serve
 ## ⚡ Rendimiento y elección de modelo
 
 La generación corre sobre un LLM local; su velocidad depende del hardware. El default es
-**`qwen2.5:1.5b-instruct`**, elegido como equilibrio velocidad/calidad para una notebook con
-CPU y poca RAM (8 GB). Levers de velocidad ya aplicados: salida acotada (`num_predict=400`),
-contexto del plan reducido a lo no aprobado, y modelo mantenido en memoria (`OLLAMA_KEEP_ALIVE`).
+**`phi4-mini`** (3.8B, Microsoft): comparado con modelos más chicos da una redacción mucho más
+fluida y **mejor grounding léxico** (0.80 con RAG vs 0.72 de qwen2.5:1.5b en el mismo pipeline),
+y sigue corriendo en CPU. Levers de velocidad ya aplicados: salida acotada (`num_predict=512`,
+un tope alto hace divagar a un modelo chico), contexto compacto, y modelo mantenido en memoria
+(`OLLAMA_KEEP_ALIVE`).
 
 | Entorno | Modelo sugerido | Generación típica |
 |---|---|---|
-| CPU + 8 GB RAM (notebook básica) | `qwen2.5:1.5b-instruct` | ~60-70 s por artefacto |
-| **GPU NVIDIA (≥6 GB VRAM)** | `qwen2.5:7b-instruct` | **pocos segundos** |
+| CPU + 8 GB RAM (notebook básica) | `phi4-mini` | ~60-130 s por artefacto |
+| **GPU NVIDIA (≥6 GB VRAM)** | `phi4-mini` o un modelo más grande | **pocos segundos** |
 
 **Para la demo en vivo conviene una máquina con GPU NVIDIA.** Setup en esa máquina:
 
 ```bash
 # 1) Clonar/copiar el repo (data/raw/ ya trae los PDFs → la base Chroma se reconstruye sola)
 # 2) Instalar Ollama (detecta la GPU NVIDIA automáticamente, sin configuración)
-ollama pull qwen2.5:7b-instruct
+ollama pull phi4-mini
 # 3) Entorno Python
 python -m venv .venv && .venv\Scripts\activate
 pip install -r requirements.txt
 python src/ingest.py                       # reconstruye la base vectorial
-set OLLAMA_MODEL=qwen2.5:7b-instruct        # usar el modelo grande
 iniciar.bat                                 # o uvicorn (ver arriba)
 ```
 
@@ -134,7 +135,7 @@ iniciar.bat                                 # o uvicorn (ver arriba)
 
 - **Extracción:** `pdfplumber`.
 - **Base vectorial + embeddings:** `chromadb` (embedding por defecto all-MiniLM-L6-v2, local y offline).
-- **Generación:** LLM local vía **Ollama** (`qwen2.5`), configurable por `OLLAMA_MODEL`.
+- **Generación:** LLM local vía **Ollama** (`phi4-mini`), configurable por `OLLAMA_MODEL`.
 
 ---
 

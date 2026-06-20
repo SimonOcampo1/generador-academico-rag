@@ -21,7 +21,7 @@ pasantías, simulaciones) imposibles de producir sin ese conocimiento privado.
 **Alcance (lo que SÍ hace).**
 - Ingesta de un corpus mixto: estructurado (notas, fechas de aprobación, correlativas,
   promedio) + **no estructurado** (programas de materias, descripciones de cátedras).
-- Pipeline RAG propio: chunking → embeddings (MiniLM) → Chroma → retrieval → qwen2.5.
+- Pipeline RAG propio: chunking → embeddings (MiniLM) → Chroma → retrieval → Phi-4-mini.
 - Generación de los artefactos de abajo, con **tono controlable**.
 - EDA + visualización del avance académico + clustering de perfiles.
 - Evaluación: grounding (¿la salida usa datos reales del RAG?) + contraste con/sin RAG.
@@ -83,7 +83,7 @@ sabemos armar el pipeline RAG** y usarlo para generar. NotebookLM no demuestra e
 
 ## Reutilización y esfuerzo
 
-- **Reutilizamos:** Ollama+qwen2.5, web app con consola en vivo, MiniLM, evaluación, notebook/informe/slides.
+- **Reutilizamos:** Ollama+Phi-4-mini, web app con consola en vivo, MiniLM, evaluación, notebook/informe/slides.
 - **Agregamos:** Chroma + chunking + retrieval + los generadores de artefactos.
 - **Esfuerzo:** bajo-medio. El dato es poco; lo nuevo es el pipeline RAG (igual para cualquier propuesta).
 - **Riesgo:** notas reales → podemos anonimizar nombres si alguien prefiere.

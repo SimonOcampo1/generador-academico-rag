@@ -143,8 +143,8 @@
       <p>El flujo: los PDFs pasan por <strong>pdfplumber</strong> a texto, los convertimos en
         documentos, los vectorizamos con <strong>MiniLM</strong> (embeddings) y los guardamos en
         <strong>Chroma</strong>, la base vectorial. Cuando llega un pedido, recuperamos los
-        documentos más relevantes y se los pasamos a <strong>qwen2.5</strong> corriendo local con
-        Ollama. Todo offline y privado.</p>
+        documentos más relevantes y se los pasamos a <strong>Phi-4-mini</strong> (un modelo de 3.8B
+        de Microsoft) corriendo local con Ollama. Todo offline y privado.</p>
       <p>Un detalle que nos importó: tenemos <strong>dos modos de recuperación</strong>. El
         <em>semántico</em>, por similitud de embeddings, para lenguaje natural; y el
         <em>determinístico</em>, por metadata, para anclar exactamente las materias aprobadas de
@@ -230,7 +230,7 @@
         <li><b>Grounding léxico:</b> fracción de tokens informativos de la salida presentes en el contexto (0 a 1).</li>
         <li><b>Grounding semántico:</b> coseno de embeddings salida↔contexto; reconoce paráfrasis que el léxico penaliza.</li>
         <li><b>Resultado validación:</b> anclada ≈ 1.0 (léxico), inventada ≈ 0.0.</li>
-        <li><b>Resultado demo (3 artefactos):</b> grounding léxico cae de <b>0.74 con RAG a 0.32 sin RAG</b>; semántico 0.61 → 0.52.</li>
+        <li><b>Resultado demo (3 artefactos, con Phi-4-mini):</b> grounding léxico cae de <b>0.80 con RAG a 0.29 sin RAG</b>; semántico 0.64 → 0.52.</li>
         <li><b>Limitación restante:</b> miden cercanía con el contexto, no consistencia lógica; no detectan contradicciones sutiles.</li>
         <li><b>Si falla la demo en vivo:</b> mostrar la celda equivalente del notebook.</li>
       </ul>

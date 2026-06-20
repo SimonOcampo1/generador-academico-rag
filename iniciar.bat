@@ -7,9 +7,9 @@ echo   Generador Academico RAG - iniciando...
 echo ===============================================
 echo.
 
-REM 0) Ajustes de velocidad para CPU con poca RAM (8 GB):
-REM    modelo chico y rapido, modelo siempre cargado, toda la CPU a una sola generacion.
-set "OLLAMA_MODEL=qwen2.5:1.5b-instruct"
+REM 0) Modelo local: Phi-4-mini (3.8B), mejor redaccion/grounding que modelos mas chicos en CPU.
+REM    Modelo siempre cargado, toda la CPU a una sola generacion.
+set "OLLAMA_MODEL=phi4-mini"
 set "OLLAMA_KEEP_ALIVE=30m"
 set "OLLAMA_NUM_PARALLEL=1"
 

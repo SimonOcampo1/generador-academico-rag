@@ -206,7 +206,7 @@ def _stream(req: GenReq):
     try:
         resp = requests.post(
             f"{rag.OLLAMA_URL}/api/chat",
-            json={"model": rag.OLLAMA_MODEL, "stream": True, "options": {"temperature": 0.4},
+            json={"model": rag.OLLAMA_MODEL, "stream": True, "options": rag.gen_options(0.4),
                   "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},
             stream=True, timeout=180)
         resp.raise_for_status()
