@@ -23,10 +23,14 @@ TONOS = {
 }
 
 _SYSTEM = (
-    "Sos un asistente académico de la UTN FRLP. Generás artefactos personalizados usando "
-    "EXCLUSIVAMENTE los datos del CONTEXTO (notas, materias, años, correlatividades reales). "
-    "No inventes notas ni materias; si un dato no está en el contexto, no lo afirmes. "
-    "Citá los datos concretos que uses."
+    "Sos un asesor académico de la UTN FRLP (carrera Ingeniería en Sistemas de Información). "
+    "Trabajás SOLO con los datos del CONTEXTO (notas, materias, años, correlatividades reales): "
+    "no inventes ni supongas datos que no estén ahí. "
+    "Pero no sos un loro de datos: INTERPRETÁ y SELECCIONÁ. Elegí los 3-5 datos más relevantes al "
+    "objetivo y explicá QUÉ revelan (una fortaleza, un patrón, una afinidad); nunca enumeres todas "
+    "las notas ni repitas el listado completo. Cuando cites un dato, que sea para sostener una idea. "
+    "Escribí en español rioplatense, claro y profesional. Usá markdown con criterio: **negrita** "
+    "para lo clave y listas solo cuando aporten."
 )
 
 
@@ -46,11 +50,14 @@ def _ctx_aprobadas_compacto(docs: list[dict]) -> str:
     En CPU el costo dominante es procesar el contexto; compactarlo acelera la generación sin
     perder los datos que el grounding necesita (nombre de materia + nota).
     """
-    filas = sorted(docs, key=lambda d: (d["metadata"]["anio"], d["metadata"]["materia"]))
-    return "\n".join(
-        f"- {d['metadata']['materia']} (nota {d['metadata']['nota']}, año {d['metadata']['anio']})"
-        for d in filas
-    )
+    filas = sorted(docs, key=lambda d: (d["metadata"]["anio"] or 99, d["metadata"]["materia"]))
+
+    def fmt(d: dict) -> str:
+        md = d["metadata"]
+        ano = f", año {md['anio']}" if md["anio"] else ""  # las del acta de notas no traen año
+        return f"- {md['materia']} (nota {md['nota']}{ano})"
+
+    return "\n".join(fmt(d) for d in filas)
 
 
 def _ctx_estado_rico(docs: list[dict]) -> str:
@@ -59,12 +66,15 @@ def _ctx_estado_rico(docs: list[dict]) -> str:
     Saca el ruido (Tomo/Folio/horas del PDF) pero conserva código + nota + año, que es lo que el
     modelo copia para mantenerse anclado en datos reales (sube el grounding sin ensuciar la prosa).
     """
-    filas = sorted(docs, key=lambda d: (d["metadata"]["anio"], d["metadata"]["materia"]))
-    return "\n".join(
-        f"- {d['metadata']['materia']} (código {d['metadata']['codigo']}, "
-        f"nota {d['metadata']['nota']}, año {d['metadata']['anio']})"
-        for d in filas
-    )
+    filas = sorted(docs, key=lambda d: (d["metadata"]["anio"] or 99, d["metadata"]["materia"]))
+
+    def fmt(d: dict) -> str:
+        md = d["metadata"]
+        cod = f"código {md['codigo']}, " if md["codigo"] else ""
+        ano = f", año {md['anio']}" if md["anio"] else ""
+        return f"- {md['materia']} ({cod}nota {md['nota']}{ano})"
+
+    return "\n".join(fmt(d) for d in filas)
 
 
 def _cursables(alumno: str) -> list[dict]:
@@ -76,16 +86,26 @@ def _cursables(alumno: str) -> list[dict]:
     reales, no sobre suposiciones). La priorización y la prosa las genera el modelo.
     """
     aprob_canon = {canon(d["metadata"]["materia"]) for d in _aprobadas(alumno)}
+    # Materias que el alumno está cursando AHORA (sin nota todavía, estado "Cursa en..."): no son
+    # candidatas a "cursar el próximo cuatrimestre" -> sin esto se recomendaban materias en curso.
+    en_curso_canon = {
+        canon(d["metadata"]["materia"])
+        for d in obtener({"$and": [{"fuente": "estado_academico"}, {"alumno": alumno}]})
+        if str(d["metadata"].get("estado", "")).startswith("Cursa")
+    }
+    excluir = aprob_canon | en_curso_canon
     corr = _correlativas()
     num_a_nombre = {int(d["metadata"]["num_plan"]): d["metadata"]["materia"] for d in corr}
-    aprob_nums = {n for n, nom in num_a_nombre.items() if canon(nom) in aprob_canon}
+    # Para CURSAR una materia hace falta tener CURSADAS sus correlativas (no aprobadas). Una materia
+    # en curso estará cursada el próximo cuatrimestre -> cuenta para habilitar la siguiente.
+    cursadas_nums = {n for n, nom in num_a_nombre.items() if canon(nom) in excluir}
     cursables: list[dict] = []
     for d in corr:
         md = d["metadata"]
-        if canon(md["materia"]) in aprob_canon:
-            continue  # ya aprobada: no es candidata a cursar
+        if canon(md["materia"]) in excluir:
+            continue  # ya aprobada o cursándose ahora: no es candidata a cursar
         req = [int(x) for x in md["cursar"].split(",") if x]
-        if all(n in aprob_nums for n in req):  # todas las correlativas para cursarla, cumplidas
+        if all(n in cursadas_nums for n in req):  # todas las correlativas para cursarla, cumplidas
             cursables.append({
                 "materia": md["materia"], "num": int(md["num_plan"]),
                 "habilitada_por": [num_a_nombre.get(n, f"materia {n}") for n in req],
@@ -93,8 +113,26 @@ def _cursables(alumno: str) -> list[dict]:
     return sorted(cursables, key=lambda c: c["num"])
 
 
+def _electivas_disponibles(alumno: str) -> list[str]:
+    """Electivas del plan que el alumno NO inició (ni aprobó ni cursa): opciones a futuro.
+
+    Las electivas no están en la tabla de correlatividades (solo las 36 obligatorias), así que se
+    toman del propio estado académico: materias no iniciadas que no son obligatorias.
+    """
+    obligatorias = {canon(d["metadata"]["materia"]) for d in _correlativas()}
+    out: list[str] = []
+    for d in obtener({"$and": [{"fuente": "estado_academico"}, {"alumno": alumno}]}):
+        md = d["metadata"]
+        est = str(md.get("estado", ""))
+        if md["nota"] >= 0 or est.startswith("Cursa") or est.startswith("Aprobada"):
+            continue  # aprobada, en curso, o aprobada por equivalencia: no es "disponible a futuro"
+        if canon(md["materia"]) not in obligatorias:  # no es de las 36 -> electiva
+            out.append(md["materia"])
+    return sorted(set(out))
+
+
 def _contexto_plan(alumno: str) -> str:
-    """Contexto del plan: rendimiento real + materias cursables ya verificadas vs el plan."""
+    """Contexto del plan: rendimiento real + obligatorias habilitadas + electivas disponibles."""
     aprob = _aprobadas(alumno)
     cursables = _cursables(alumno)
     if cursables:
@@ -105,13 +143,20 @@ def _contexto_plan(alumno: str) -> str:
             for c in cursables
         )
     else:
-        filas = "- (no hay materias nuevas habilitadas con las correlativas actuales)"
+        filas = "- (no quedan obligatorias nuevas habilitadas: están aprobadas o en curso)"
+
+    electivas = _electivas_disponibles(alumno)
+    bloque_elec = ""
+    if electivas:
+        bloque_elec = (
+            "\n\nELECTIVAS del plan aún disponibles (no iniciadas; el alumno puede elegirlas):\n"
+            + "\n".join(f"- {e}" for e in electivas)
+        )
     return (
         f"RENDIMIENTO de {alumno} (materias aprobadas con su nota y año):\n"
         f"{_ctx_aprobadas_compacto(aprob)}\n\n"
-        f"MATERIAS QUE {alumno} YA PUEDE CURSAR el próximo cuatrimestre "
-        f"(verificado contra las correlatividades del plan: todas las correlativas para cursarlas "
-        f"ya están aprobadas):\n{filas}"
+        f"OBLIGATORIAS QUE {alumno} YA PUEDE CURSAR el próximo cuatrimestre "
+        f"(verificado contra las correlatividades del plan):\n{filas}{bloque_elec}"
     )
 
 
@@ -130,11 +175,13 @@ def _generar(system: str, contexto: str, instruccion: str, temperatura: float = 
 def plan_cursada(alumno: str, tono: str = "tecnico") -> dict:
     contexto = _contexto_plan(alumno)
     instr = (
-        f"Armá el plan de cursada del próximo cuatrimestre para {alumno}. Usá EXCLUSIVAMENTE el "
-        "listado 'MATERIAS QUE YA PUEDE CURSAR' del contexto (ya verificado contra el plan): NO "
-        "incluyas materias fuera de ese listado ni materias ya aprobadas. De ese listado, recomendá "
-        "en prosa cuáles conviene PRIORIZAR y por qué, justificando con su rendimiento (las áreas y "
-        "notas donde mejor le va) y con las correlativas que cada una habilita hacia adelante. "
+        f"Armá el plan de cursada del próximo cuatrimestre para {alumno}.\n"
+        "Reglas duras: elegí SOLO materias listadas en 'OBLIGATORIAS QUE YA PUEDE CURSAR' y/o en "
+        "'ELECTIVAS disponibles'; jamás incluyas materias aprobadas, en curso o fuera de esas listas.\n"
+        "Tarea: recomendá un orden de prioridad (no hace falta usar todas). Priorizá las OBLIGATORIAS "
+        "habilitadas (destraban la carrera) y, si hay cupo, sumá 1-2 ELECTIVAS afines a sus fortalezas. "
+        "Para cada materia, una justificación corta que combine: (1) afinidad con las áreas donde mejor "
+        "rinde, (2) qué destraba o qué perfil refuerza. Cerrá con una sugerencia de carga realista. "
         f"{TONOS.get(tono, '')}"
     )
     return {"artefacto": "plan_cursada", "alumno": alumno, "tono": tono, **_generar(_SYSTEM, contexto, instr)}
@@ -143,8 +190,12 @@ def plan_cursada(alumno: str, tono: str = "tecnico") -> dict:
 def informe_trayectoria(alumno: str, tono: str = "motivacional") -> dict:
     contexto = _ctx_estado_rico(_aprobadas(alumno))
     instr = (
-        f"Escribí un informe narrativo de la trayectoria académica de {alumno}: evolución por año, "
-        "fortalezas y debilidades por área, y un consejo final. Apoyate en notas y materias reales. "
+        f"Escribí un informe de la trayectoria académica de {alumno}, en prosa narrativa (no un "
+        "listado).\n"
+        "Cubrí tres cosas: (1) la evolución a lo largo de los años (cómo arrancó y cómo progresó), "
+        "(2) sus áreas más fuertes y las más flojas, INTERPRETANDO qué dicen las notas sobre su "
+        "perfil —no las recites—, (3) un consejo final accionable y concreto. Usá pocas notas, las "
+        "más ilustrativas, como evidencia de lo que afirmás. "
         f"{TONOS.get(tono, '')}"
     )
     return {"artefacto": "informe_trayectoria", "alumno": alumno, "tono": tono, **_generar(_SYSTEM, contexto, instr, 0.6)}
@@ -153,8 +204,14 @@ def informe_trayectoria(alumno: str, tono: str = "motivacional") -> dict:
 def carta_pasantia(alumno: str, objetivo: str = "una pasantía en Ciencia de Datos", tono: str = "tecnico") -> dict:
     contexto = _ctx_estado_rico(_aprobadas(alumno))
     instr = (
-        f"Redactá una carta de motivación de {alumno} para {objetivo}. Seleccioná y destacá las "
-        "materias y notas del contexto más relevantes al objetivo. Formato carta, 2-3 párrafos. "
+        f"Escribí, en PRIMERA PERSONA (la voz de {alumno}), una carta de presentación para postularse "
+        f"a {objetivo}.\n"
+        "Estructura: (1) saludo y una frase de interés genuino por el puesto; (2) el cuerpo: elegí 2 o "
+        "3 fortalezas REALMENTE relevantes a ese objetivo y conectá cada una con la competencia que el "
+        "puesto pide (ej.: una materia o área fuerte → una habilidad concreta que aporta). NO enumeres "
+        "el historial ni listes notas año por año; mencioná a lo sumo una o dos notas como respaldo; "
+        "(3) cierre breve con disponibilidad y agradecimiento.\n"
+        "Que suene a una persona, no a un currículum. Máximo ~230 palabras. "
         f"{TONOS.get(tono, '')}"
     )
     return {"artefacto": "carta_pasantia", "alumno": alumno, "objetivo": objetivo, "tono": tono,
@@ -162,16 +219,35 @@ def carta_pasantia(alumno: str, objetivo: str = "una pasantía en Ciencia de Dat
 
 
 def recomendar_orientacion(alumno: str, tono: str = "tecnico") -> dict:
-    """Matching semántico: cruza las materias donde mejor le fue con el espacio de materias."""
-    mejores = sorted(_aprobadas(alumno), key=lambda d: d["metadata"]["nota"], reverse=True)[:6]
-    consulta = " ".join(d["metadata"]["materia"] for d in mejores)
-    vecinas = buscar(consulta, k=6, where={"fuente": "correlatividades"})
-    contexto = "Materias donde mejor rindió:\n" + _ctx_aprobadas_compacto(mejores) + \
-        "\n\nMaterias semánticamente afines a sus fortalezas:\n" + \
-        "\n".join(f"- {h['text']}" for h in vecinas)
+    """Recomienda una rama/especialización de la carrera anclada en el promedio por área real.
+
+    Todos cursan la misma carrera: la pregunta no es 'qué carrera' sino en qué ÁREA temática
+    (las de analisis.AREAS) conviene perfilarse según dónde rinde mejor. Se le da al modelo el
+    promedio por área + ejemplos de materias, y se le pide elegir y comparar entre esas áreas.
+    """
+    df = analisis.tabla_real()
+    sub = df[df["alumno"] == alumno]
+    agg = (sub[sub["area"] != "Otras"].groupby("area")["nota"]
+           .agg(prom="mean", n="count").sort_values("prom", ascending=False))
+    lineas = []
+    for area, r in agg.iterrows():
+        top = sub[sub["area"] == area].sort_values("nota", ascending=False).head(3)
+        ej = ", ".join(f"{t.materia} ({t.nota})" for t in top.itertuples())
+        lineas.append(f"- {area}: promedio {r.prom:.1f} en {int(r.n)} materias. Mejores: {ej}")
+    contexto = (
+        "Desempeño de " + alumno + " por área temática de la carrera (de mejor a peor promedio). "
+        "Es EVIDENCIA de sus fortalezas, no la lista de respuestas:\n" + "\n".join(lineas)
+    )
     instr = (
-        f"Recomendá una orientación/perfil profesional para {alumno} a partir de las materias donde "
-        "mejor rindió y sus afines. Justificá con los datos. No inventes electivas que no figuren. "
+        f"Recomendá a {alumno} hacia qué especialización o rama profesional de la Ingeniería en "
+        "Sistemas le conviene orientarse.\n"
+        "Cómo razonar: identificá en qué áreas es más fuerte según la evidencia, y traducí esas "
+        "fortalezas a especializaciones REALES del mundo laboral del software (las que vos conocés: "
+        "p. ej. desarrollo, datos, infraestructura, gestión, etc. — elegí las que de verdad encajen, "
+        "no las nombres todas). Recomendá 1 o 2.\n"
+        "Para cada una: nombrala, conectala con las materias/áreas concretas que la respaldan, y "
+        "describí qué tipo de trabajo o perfil implica. Interpretá los datos, no los repitas; y sé "
+        "honesto: no sugieras una rama que su desempeño no sostenga. "
         f"{TONOS.get(tono, '')}"
     )
     return {"artefacto": "recomendar_orientacion", "alumno": alumno, "tono": tono,
@@ -186,8 +262,10 @@ def diagnostico_grupal(tono: str = "tecnico") -> dict:
         areas = ", ".join(f"{a}: {v:.1f}" for a, v in row.dropna().items() if a != "Otras")
         contexto += f"- {alumno} -> {areas}\n"
     instr = (
-        "Para un proyecto de software en equipo, asigná un rol a cada integrante según sus "
-        "fortalezas por área, justificando con los números del contexto. "
+        "Para un proyecto de software en equipo, asigná a CADA integrante un rol concreto (p. ej. "
+        "líder técnico, backend, datos/ML, infra, QA, análisis funcional) según su área más fuerte. "
+        "Justificá cada asignación con el número que la respalda. Evitá repetir el mismo rol salvo "
+        "que los datos lo justifiquen, y buscá que el equipo quede balanceado. "
         f"{TONOS.get(tono, '')}"
     )
     return {"artefacto": "diagnostico_grupal", "tono": tono, **_generar(_SYSTEM, contexto, instr)}
@@ -206,8 +284,10 @@ def simulacion_whatif(alumno: str, materias_nota: dict[str, int], tono: str = "t
         f"Promedio proyectado: {prom_nuevo:.2f} sobre {len(proyectado)} materias."
     )
     instr = (
-        f"Explicá en prosa el impacto del escenario en el promedio de {alumno} y qué implica para su "
-        f"avance. Usá los números del contexto. {TONOS.get(tono, '')}"
+        f"Explicá en prosa qué impacto tiene el escenario en el promedio de {alumno}: no solo el número "
+        "nuevo, sino qué SIGNIFICA (mejora/empeora, cuánto pesa, si conviene priorizar esas materias). "
+        "Apoyate en los números del contexto y dale una lectura útil para decidir. "
+        f"{TONOS.get(tono, '')}"
     )
     return {"artefacto": "simulacion_whatif", "alumno": alumno, "tono": tono,
             "prom_actual": round(prom_actual, 2), "prom_nuevo": round(prom_nuevo, 2),
@@ -223,7 +303,8 @@ if __name__ == "__main__":
     assert "Simón Ocampo" in r["contexto"], "el contexto no trae las aprobadas del alumno"
     print(f"\n[plan_cursada] fuente={r['fuente']} · contexto {len(r['contexto'])} chars")
 
-    w = simulacion_whatif("Simón Ocampo", {"Ciencia de Datos": 9, "Inteligencia Artificial": 8})
+    # notas lejos de cualquier promedio para que el escenario siempre mueva el promedio
+    w = simulacion_whatif("Simón Ocampo", {"Refuerzo I": 4, "Refuerzo II": 4})
     assert w["prom_nuevo"] != w["prom_actual"], "el what-if no cambió el promedio"
     print(f"[whatif] {w['prom_actual']} -> {w['prom_nuevo']}")
 

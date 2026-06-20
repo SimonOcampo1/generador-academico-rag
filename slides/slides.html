@@ -169,10 +169,10 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel);border:1px so
     <h2>Un corpus mixto y privado</h2>
     <div class="row" style="margin-top:24px;align-items:center;">
       <ul class="clean grow">
-        <li class="frag"><strong>418 documentos</strong>: estados, notas y plan 2023.</li>
+        <li class="frag"><strong>439 documentos</strong>: estados, notas y plan 2023.</li>
         <li class="frag">Estructurado (notas, años) + no estructurado (plan).</li>
         <li class="frag">Join por <em>nombre normalizado</em>: los códigos no coinciden.</li>
-        <li class="frag"><strong>199 notas reales</strong> de los 6 integrantes (prom. 7.9–8.7).</li>
+        <li class="frag"><strong>220 notas reales</strong> de los 6 integrantes (prom. 8.0–8.7).</li>
       </ul>
       <div class="grow frag">
         <div class="figbox"><img src="../figs/avance_anual.png" alt="Avance anual" /></div>
@@ -186,12 +186,12 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel);border:1px so
     <span class="eyebrow">Arquitectura</span>
     <h2>El pipeline RAG, de punta a punta</h2>
     <div class="row" style="margin-top:26px;align-items:center;">
-      <p class="lead grow">Cada etapa la construimos nosotros, local y offline. La recuperación tiene dos modos: <em>semántico</em> y <em>determinístico por metadata</em>.</p>
+      <p class="lead grow">Cada etapa la construimos nosotros. El pipeline corre <em>local</em>; la generación, en GPU gratuita (Colab) o local. La recuperación tiene dos modos: <em>semántico</em> y <em>determinístico por metadata</em>.</p>
       <div class="pipe grow">
         <div class="step frag"><b>PDFs</b> → pdfplumber → documentos</div>
         <div class="step frag">→ embeddings <b>MiniLM</b> → <b>Chroma</b></div>
         <div class="step frag">→ retrieval top-k → <b>contexto</b></div>
-        <div class="step frag">→ <b>Phi-4-mini</b> (Ollama) → artefacto</div>
+        <div class="step frag">→ <b>qwen2.5:14B</b> (Ollama · GPU) → artefacto</div>
       </div>
     </div>
   </section>
@@ -233,12 +233,12 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel);border:1px so
       <div class="vcard on frag">
         <div class="tag">Con RAG</div>
         <p>Cita las materias aprobadas reales, las correlativas y las notas. Genera el plan anclado.</p>
-        <div class="g">grounding léxico 0.80</div>
+        <div class="g">grounding léxico 0.64</div>
       </div>
       <div class="vcard off frag">
         <div class="tag">Sin RAG</div>
         <p>Sin el historial privado, el modelo se generaliza o inventa materias que no existen.</p>
-        <div class="g">grounding léxico 0.29</div>
+        <div class="g">grounding léxico 0.25</div>
       </div>
     </div>
     <p class="frag" style="margin-top:26px;color:var(--muted);">Mismo pedido, un botón. La diferencia es el conocimiento privado.</p>
@@ -249,11 +249,11 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel);border:1px so
     <span class="eyebrow">Evaluación</span>
     <h2>Medimos el anclaje</h2>
     <div class="metrics" style="margin-top:26px;">
-      <div class="metric frag"><div class="num">léxico</div><div class="lbl">tokens de la salida (materias, notas) presentes en el contexto</div></div>
-      <div class="metric frag"><div class="num">semántico</div><div class="lbl">coseno de embeddings salida↔contexto; reconoce paráfrasis</div></div>
-      <div class="metric frag"><div class="num">1.0 / 0.0</div><div class="lbl">salida anclada vs. inventada en la validación</div></div>
+      <div class="metric frag"><div class="num">1.0</div><div class="lbl"><strong>precisión factual</strong> con RAG: cada par (materia, nota) que afirma coincide con el registro real. Sin RAG no cita ninguno.</div></div>
+      <div class="metric frag"><div class="num">0.73→0.50</div><div class="lbl"><strong>faithfulness</strong>: un LLM juzga la fidelidad al contexto. Con RAG vs. sin RAG.</div></div>
+      <div class="metric frag"><div class="num">4 / 4</div><div class="lbl">métricas donde <strong>con RAG &gt; sin RAG</strong> (léxico, semántico, precisión, faithfulness).</div></div>
     </div>
-    <p class="frag" style="margin-top:32px;max-width:64ch;">Dos métricas complementarias: el léxico es explicable pero castiga la reformulación; el semántico la reconoce. Limitación restante: miden cercanía con el contexto, no consistencia lógica.</p>
+    <p class="frag" style="margin-top:32px;max-width:66ch;">Cuatro métricas en tres ejes: <em>solapamiento</em> (léxico/semántico), <em>corrección factual</em> (precisión) y <em>juicio de un LLM</em> (faithfulness). La estrella: <strong>cero notas inventadas con RAG</strong>. El valor absoluto tiene varianza; lo robusto es la dirección.</p>
   </section>
 
   <!-- 9 · Clustering / diagnóstico (Lautaro) -->

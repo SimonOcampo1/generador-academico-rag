@@ -106,7 +106,7 @@
     <div class="cue">Slide 3 · Datos y exploración</div>
     <div class="speech">
       <p>Gracias, Tomás. El corazón del proyecto son los datos, y son <strong>privados</strong>:
-        el modelo no los conoce. Armamos un corpus de <strong>418 documentos</strong> a partir de
+        el modelo no los conoce. Armamos un corpus de <strong>439 documentos</strong> a partir de
         PDFs reales: los estados académicos y exports de notas de <strong>los seis integrantes</strong>
         del grupo, más el Plan de Sistemas 2023 con todas las correlatividades.</p>
       <p>Lo interesante es que el corpus es <em>mixto</em>: combinamos lo <strong>estructurado</strong>
@@ -114,17 +114,18 @@
         plan). El desafío técnico más grande fue el <em>join</em>: los códigos de materia no
         coinciden entre el estado y el plan, así que unimos por el <strong>nombre normalizado</strong>,
         sin tildes ni mayúsculas. Parseamos las 36 obligatorias con sus correlativas.</p>
-      <p>Sobre eso hicimos el EDA: son <strong>199 notas reales</strong> de los seis, con promedios
-        parejos entre <strong>7.9 y 8.7</strong>. Las diferencias verdaderas aparecen al
+      <p>Sobre eso hicimos el EDA: son <strong>220 notas reales</strong> de los seis, con promedios
+        parejos entre <strong>8.0 y 8.7</strong>. Las diferencias verdaderas aparecen al
         desagregar por área temática, y eso es justo lo que después explota el diagnóstico grupal.</p>
     </div>
     <div class="claves">
       <div class="h">Claves para estudiar / si te preguntan</div>
       <ul>
-        <li><b>Corpus:</b> 418 docs (362 de estados, 36 correlativas, 20 chunks del plan).</li>
+        <li><b>Corpus:</b> 439 docs (383 de estados, 36 correlativas, 20 chunks del plan).</li>
         <li><b>Por qué normalizar:</b> los códigos institucionales no coinciden entre documentos; el nombre normalizado es la clave de join.</li>
-        <li><b>EDA:</b> 199 notas reales de los 6 integrantes, promedios 7.9–8.7; se compara por área temática.</li>
+        <li><b>EDA:</b> 220 notas reales de los 6 integrantes, promedios 8.0–8.7; se compara por área temática.</li>
         <li><b>Equivalencias 2008↔2023:</b> el export de notas usa nombres del Plan 2008; los canonizamos al 2023 (Anexo II) para no perder notas por equivalencia.</li>
+        <li><b>Export de notas más completo:</b> trae materias aprobadas que no figuran en el estado académico; se suman como aprobadas con su nota (si no, el plan las recomendaría como pendientes).</li>
       </ul>
     </div>
     <p class="handoff">Cierre: "Con esos datos limpios, Santi les muestra cómo los convertimos en algo que el modelo puede consultar." → pasa a <strong>Santiago</strong>.</p>
@@ -143,8 +144,10 @@
       <p>El flujo: los PDFs pasan por <strong>pdfplumber</strong> a texto, los convertimos en
         documentos, los vectorizamos con <strong>MiniLM</strong> (embeddings) y los guardamos en
         <strong>Chroma</strong>, la base vectorial. Cuando llega un pedido, recuperamos los
-        documentos más relevantes y se los pasamos a <strong>Phi-4-mini</strong> (un modelo de 3.8B
-        de Microsoft) corriendo local con Ollama. Todo offline y privado.</p>
+        documentos más relevantes y se los pasamos a <strong>qwen2.5 (14B)</strong> vía Ollama.
+        Todo el pipeline corre local; la generación la podemos correr en una <strong>GPU gratuita
+        de Colab</strong> para usar un modelo grande en segundos, o 100% local. Los datos nunca
+        pasan por un proveedor externo: la privacidad se mantiene.</p>
       <p>Un detalle que nos importó: tenemos <strong>dos modos de recuperación</strong>. El
         <em>semántico</em>, por similitud de embeddings, para lenguaje natural; y el
         <em>determinístico</em>, por metadata, para anclar exactamente las materias aprobadas de
@@ -215,23 +218,24 @@
         que se generaliza o directamente inventa materias que no existen.</p>
 
       <div class="cue">Slide 8 · Cómo lo medimos</div>
-      <p>Y esto no es impresión nuestra, lo <strong>medimos</strong>, con dos métricas. El
-        <em>grounding léxico</em>: qué fracción de los datos de la salida (nombres de materias,
-        notas) aparecen literalmente en el contexto. Anclada da cerca de <strong>1.0</strong>;
-        inventada, cerca de <strong>0.0</strong>. Y como el léxico castiga la paráfrasis legítima,
-        sumamos un <em>grounding semántico</em>: similitud de embeddings entre la salida y el
-        contexto. Las dos métricas juntas separan lo anclado de lo inventado sin penalizar que el
-        modelo reformule.</p>
+      <p>Y esto no es impresión nuestra, lo <strong>medimos</strong> con cuatro métricas en tres
+        ejes. Las dos de <em>grounding</em>, léxico y semántico, miden cuánto se solapa la salida con
+        el contexto. Pero la más contundente es la <em>precisión factual</em>: agarramos cada par
+        materia-nota que el modelo afirma y lo verificamos contra el registro real. Con RAG da
+        <strong>1.0</strong> &mdash;cero notas inventadas&mdash;; sin RAG no cita un solo dato real.
+        Y sumamos <em>faithfulness</em>, donde el propio modelo juzga la fidelidad al contexto:
+        <strong>0.73 con RAG contra 0.50 sin</strong>. En las cuatro, con RAG le gana a sin RAG.</p>
     </div>
     <div class="claves">
       <div class="h">Claves para estudiar / si te preguntan</div>
       <ul>
         <li><b>Demo:</b> mismo input, con/sin contexto; muestra que el valor está en el dato privado.</li>
-        <li><b>Grounding léxico:</b> fracción de tokens informativos de la salida presentes en el contexto (0 a 1).</li>
-        <li><b>Grounding semántico:</b> coseno de embeddings salida↔contexto; reconoce paráfrasis que el léxico penaliza.</li>
-        <li><b>Resultado validación:</b> anclada ≈ 1.0 (léxico), inventada ≈ 0.0.</li>
-        <li><b>Resultado demo (3 artefactos, con Phi-4-mini):</b> grounding léxico cae de <b>0.80 con RAG a 0.29 sin RAG</b>; semántico 0.64 → 0.52.</li>
-        <li><b>Limitación restante:</b> miden cercanía con el contexto, no consistencia lógica; no detectan contradicciones sutiles.</li>
+        <li><b>4 métricas / 3 ejes:</b> solapamiento (léxico, semántico), corrección factual (precisión) y juicio de un LLM (faithfulness).</li>
+        <li><b>Grounding léxico/semántico:</b> tokens de la salida en el contexto / coseno de embeddings; el semántico reconoce paráfrasis que el léxico penaliza.</li>
+        <li><b>Precisión factual (la estrella):</b> de los pares (materia, nota) que afirma, qué fracción coincide con el registro real. Con RAG = <b>1.0</b> (cero inventadas); sin RAG no cita ninguno.</li>
+        <li><b>Faithfulness:</b> un LLM puntúa 0–1 la fidelidad al contexto. <b>0.73 con / 0.50 sin</b>.</li>
+        <li><b>Resultado (4 artefactos, qwen2.5:14B):</b> en las 4 métricas con RAG &gt; sin RAG. Grounding léxico 0.55/0.36, semántico 0.57/0.51.</li>
+        <li><b>Honestidad metodológica:</b> el léxico varía entre corridas (generación estocástica); lo robusto es la dirección y la precisión 1.0. Ninguna métrica detecta contradicciones lógicas sutiles.</li>
         <li><b>Si falla la demo en vivo:</b> mostrar la celda equivalente del notebook.</li>
       </ul>
     </div>

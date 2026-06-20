@@ -99,7 +99,11 @@ def _kwargs(req: GenReq) -> dict:
 
 @app.get("/api/health")
 def health():
-    return {"ollama": rag.ollama_disponible(), "model": rag.OLLAMA_MODEL, "tonos": list(generar.TONOS)}
+    remoto = rag.es_remoto()
+    host = rag.OLLAMA_URL.split("://", 1)[-1]
+    return {"ollama": rag.ollama_disponible(), "model": rag.OLLAMA_MODEL,
+            "remoto": remoto, "backend": "Colab" if remoto else "local", "host": host,
+            "tonos": list(generar.TONOS)}
 
 
 @app.get("/api/opciones")
@@ -206,7 +210,9 @@ def _stream(req: GenReq):
     try:
         resp = requests.post(
             f"{rag.OLLAMA_URL}/api/chat",
-            json={"model": rag.OLLAMA_MODEL, "stream": True, "options": rag.gen_options(0.4),
+            headers=rag.HEADERS,
+            json={"model": rag.OLLAMA_MODEL, "stream": True, "keep_alive": rag.OLLAMA_KEEP_ALIVE,
+                  "options": rag.gen_options(0.4),
                   "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},
             stream=True, timeout=180)
         resp.raise_for_status()

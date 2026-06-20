@@ -18,6 +18,14 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "phi4-mini")
 # Mantener el modelo cargado entre pedidos evita el costo de recarga en cada generación.
 OLLAMA_KEEP_ALIVE = os.environ.get("OLLAMA_KEEP_ALIVE", "30m")
+# Cuando el LLM corre en Colab vía túnel ngrok-free, éste intercala una página de aviso salvo que
+# se mande este header. Inofensivo contra un Ollama local. Ver colab/generar_en_colab.ipynb.
+HEADERS = {"ngrok-skip-browser-warning": "true"}
+
+
+def es_remoto() -> bool:
+    """True si la generación corre en otra máquina (Colab) y no en un Ollama local."""
+    return "localhost" not in OLLAMA_URL and "127.0.0.1" not in OLLAMA_URL
 
 SYSTEM = (
     "Sos un asistente académico de la UTN FRLP. Respondé SOLO con la información del "
@@ -27,8 +35,9 @@ SYSTEM = (
 
 
 def ollama_disponible() -> bool:
+    # timeout holgado: vía túnel ngrok el primer /api/tags puede tardar más que en localhost.
     try:
-        return requests.get(f"{OLLAMA_URL}/api/tags", timeout=2).status_code == 200
+        return requests.get(f"{OLLAMA_URL}/api/tags", headers=HEADERS, timeout=5).status_code == 200
     except requests.RequestException:
         return False
 
@@ -52,6 +61,7 @@ def chat(system: str, user: str, temperature: float = 0.4, num_predict: int = NU
         return None
     r = requests.post(
         f"{OLLAMA_URL}/api/chat",
+        headers=HEADERS,
         json={"model": OLLAMA_MODEL, "stream": False, "keep_alive": OLLAMA_KEEP_ALIVE,
               "options": gen_options(temperature, num_predict),
               "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},

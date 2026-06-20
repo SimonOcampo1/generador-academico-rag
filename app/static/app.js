@@ -1,6 +1,33 @@
 "use strict";
 const $ = (s) => document.querySelector(s);
-const state = { tono: "tecnico", artefactos: {}, busy: false };
+const state = { tono: "tecnico", artefactos: {}, busy: false, genRaw: "", rag: true };
+
+/* ---- markdown mínimo (lo que generan los artefactos: títulos, **negrita**, *cursiva*, listas) ---- */
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function inlineMd(s) {
+  return s
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+function mdToHtml(src) {
+  const lines = escapeHtml(src).split(/\r?\n/);
+  let html = "", list = null;
+  const closeList = () => { if (list) { html += `</${list}>`; list = null; } };
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    let m;
+    if (/^\s*$/.test(line)) { closeList(); continue; }
+    if ((m = line.match(/^(#{1,6})\s+(.*)$/))) { closeList(); const n = m[1].length; html += `<h${n}>${inlineMd(m[2])}</h${n}>`; continue; }
+    if ((m = line.match(/^\s*[-*]\s+(.*)$/))) { if (list !== "ul") { closeList(); list = "ul"; html += "<ul>"; } html += `<li>${inlineMd(m[1])}</li>`; continue; }
+    if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) { if (list !== "ol") { closeList(); list = "ol"; html += "<ol>"; } html += `<li>${inlineMd(m[1])}</li>`; continue; }
+    closeList(); html += `<p>${inlineMd(line)}</p>`;
+  }
+  closeList();
+  return html;
+}
 
 /* ---- tema ---- */
 function applyTheme(t) {
@@ -69,6 +96,11 @@ async function init() {
     tSeg.appendChild(b);
   });
 
+  const rSeg = $("#ragSeg");
+  rSeg.querySelectorAll("button").forEach((b) => {
+    b.onclick = () => { state.rag = b.dataset.rag === "1"; selectGroup(rSeg, b); };
+  });
+
   aSel.onchange = syncFields; syncFields();
   enhanceSelect(aSel); enhanceSelect($("#alumno"));
   bindViewPills();
@@ -96,13 +128,39 @@ function syncFields() {
   $("#whatifField").classList.toggle("hidden", !spec.whatif);
 }
 
+let _downStreak = 0;  // health: evita que un blip aislado tire el banner a "desconectado"
 async function health() {
+  // Durante la generación la GPU está ocupada con el request largo: el health /api/tags puede
+  // tardar/timeout y reportar un falso "desconectado". No chequeamos mientras se genera.
+  if (state.busy) return;
   try {
     const h = await (await fetch("/api/health")).json();
-    $("#dot").classList.toggle("up", h.ollama);
-    $("#ollamaTxt").textContent = h.ollama ? `${h.model} listo` : "modelo apagado · solo-retrieval";
-    $("#toggleModel").dataset.up = h.ollama ? "1" : "0";
-    $("#toggleModel").title = h.ollama ? "Apagar modelo" : "Encender modelo";
+    _downStreak = h.ollama ? 0 : _downStreak + 1;
+    const conectado = h.ollama || _downStreak < 2;  // hace falta 2 fallos seguidos para marcar caído
+
+    $("#dot").classList.toggle("up", conectado);
+    $("#ollamaTxt").textContent = conectado ? `${h.model} listo` : "modelo apagado · solo-retrieval";
+
+    // Banner de backend: deja claro si el modelo corre local o en Colab, y si está conectado.
+    const bar = $("#backendBar");
+    bar.classList.toggle("up", conectado);
+    bar.classList.toggle("down", h.remoto && !conectado);
+    if (h.remoto) {
+      $("#backendTxt").textContent = conectado
+        ? `Generación en Colab (GPU) · ${h.model}`
+        : "Colab no conectado · corré el notebook (Ejecutar todo) · solo-retrieval";
+      $("#backendHost").textContent = h.host ? `— ${h.host}` : "";
+    } else {
+      $("#backendTxt").textContent = conectado
+        ? `Modelo local · ${h.model}`
+        : "Modelo local apagado · solo-retrieval";
+      $("#backendHost").textContent = "";
+    }
+
+    // El botón de encender/apagar maneja un Ollama local: no aplica cuando el modelo está en Colab.
+    $("#toggleModel").hidden = h.remoto;
+    $("#toggleModel").dataset.up = conectado ? "1" : "0";
+    $("#toggleModel").title = conectado ? "Apagar modelo" : "Encender modelo";
   } catch { /* server caído */ }
 }
 
@@ -116,7 +174,7 @@ async function toggleModel() {
 function body() {
   const spec = state.artefactos[$("#artefacto").value];
   if (!spec) return null;  // opciones aún cargando (la 1ra vez se arma el corpus): evitar romper
-  const r = { artefacto: $("#artefacto").value, tono: state.tono, rag: true };
+  const r = { artefacto: $("#artefacto").value, tono: state.tono, rag: state.rag };
   if (spec.alumno) r.alumno = $("#alumno").value;
   if (spec.objetivo) r.objetivo = $("#objetivo").value;
   if (spec.whatif) r.materias_nota = { [$("#wifMateria").value]: Number($("#wifNota").value) };
@@ -130,7 +188,7 @@ async function generar() {
   state.busy = true;
   const go = $("#go"); go.disabled = true; go.textContent = "Generando…";
   $("#hint").textContent = "";
-  $("#gen").classList.remove("placeholder"); $("#gen").textContent = "";
+  state.genRaw = ""; $("#gen").classList.remove("placeholder"); $("#gen").classList.add("rendered"); $("#gen").innerHTML = "";
   $("#ctx").textContent = "recuperando…";
   $("#groundBox").classList.add("hidden"); $("#stats").textContent = "generando…"; $("#srcTag").textContent = "";
   showView("artifact");
@@ -163,11 +221,14 @@ async function generar() {
 function handle(ev) {
   if (ev.type === "meta") {
     $("#ctx").textContent = ev.contexto;
-    $("#srcTag").textContent = `${ev.model} · ${ev.tono}`;
+    $("#srcTag").textContent = `${ev.model} · ${ev.tono} · ${ev.rag ? "CON RAG" : "SIN RAG"}`;
   } else if (ev.type === "token") {
-    $("#gen").textContent += ev.text;
+    state.genRaw += ev.text;
+    // ponytail: re-render del buffer completo por token; los artefactos son cortos, sobra
+    $("#gen").innerHTML = mdToHtml(state.genRaw);
     $("#viewArtifact").scrollTop = $("#viewArtifact").scrollHeight;
   } else if (ev.type === "done") {
+    $("#gen").innerHTML = mdToHtml(state.genRaw);  // render final (cierra markdown incompleto)
     if (ev.grounding != null) showGround(ev.grounding);
     $("#stats").textContent = (ev.stats && ev.stats.tokens)
       ? `${ev.stats.tokens} tokens · ${ev.stats.tok_s} tok/s · ${ev.stats.segundos}s · ${ev.fuente}`

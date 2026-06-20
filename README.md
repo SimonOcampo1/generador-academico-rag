@@ -101,33 +101,77 @@ ollama serve
 
 ## ⚡ Rendimiento y elección de modelo
 
-La generación corre sobre un LLM local; su velocidad depende del hardware. El default es
-**`phi4-mini`** (3.8B, Microsoft): comparado con modelos más chicos da una redacción mucho más
-fluida y **mejor grounding léxico** (0.80 con RAG vs 0.72 de qwen2.5:1.5b en el mismo pipeline),
-y sigue corriendo en CPU. Levers de velocidad ya aplicados: salida acotada (`num_predict=512`,
-un tope alto hace divagar a un modelo chico), contexto compacto, y modelo mantenido en memoria
-(`OLLAMA_KEEP_ALIVE`).
+La generación corre sobre un LLM por Ollama; el modelo es configurable con `OLLAMA_MODEL` y la
+velocidad depende del hardware. Para la **mejor calidad** usamos **`qwen2.5:14b-instruct`** en GPU
+(la redacción interpreta y selecciona datos en vez de listar notas); en CPU sin GPU el default es
+**`phi4-mini`** (3.8B), más liviano. Levers ya aplicados: tope de salida (`OLLAMA_NUM_PREDICT`),
+contexto compacto y modelo mantenido en memoria (`OLLAMA_KEEP_ALIVE`).
 
 | Entorno | Modelo sugerido | Generación típica |
 |---|---|---|
 | CPU + 8 GB RAM (notebook básica) | `phi4-mini` | ~60-130 s por artefacto |
-| **GPU NVIDIA (≥6 GB VRAM)** | `phi4-mini` o un modelo más grande | **pocos segundos** |
+| **GPU NVIDIA local (≥8 GB VRAM)** | `qwen2.5:14b-instruct` | **~30-45 s** |
+| **GPU en Colab (T4 16 GB, gratis)** | `qwen2.5:14b-instruct` (o `7b` para más velocidad) | **~30-45 s** |
 
-**Para la demo en vivo conviene una máquina con GPU NVIDIA.** Setup en esa máquina:
+El pipeline RAG (extracción, embeddings, Chroma, retrieval) corre siempre local en CPU; lo
+único que pesa es la generación del LLM. Hay dos formas de darle GPU para la demo, y en ambas
+**no cambia una línea de código**: `rag.py` lee la URL del modelo de la variable `OLLAMA_URL`.
+
+### Opción A — PC con GPU NVIDIA local
+
+Todo offline y privado en una sola máquina. Setup en la máquina con GPU:
 
 ```bash
 # 1) Clonar/copiar el repo (data/raw/ ya trae los PDFs → la base Chroma se reconstruye sola)
 # 2) Instalar Ollama (detecta la GPU NVIDIA automáticamente, sin configuración)
-ollama pull phi4-mini
+ollama pull qwen2.5:7b-instruct
 # 3) Entorno Python
 python -m venv .venv && .venv\Scripts\activate
 pip install -r requirements.txt
 python src/ingest.py                       # reconstruye la base vectorial
+set OLLAMA_MODEL=qwen2.5:7b-instruct        # o editá iniciar.bat
 iniciar.bat                                 # o uvicorn (ver arriba)
 ```
 
+### Opción B — LLM en Google Colab (GPU T4 gratis, sin GPU propia)
+
+Si nadie tiene GPU, Colab presta una T4 gratis. La web sigue en tu PC; solo la generación
+viaja a Colab por un túnel con **URL fija** (ngrok), así no se copia ni pega nada.
+
+**Setup por única vez:**
+
+```text
+1) Cuenta gratis en ngrok → copiá tu authtoken y reclamá tu dominio estático gratis
+   (Dashboard → Domains, ej. grupo14-rag.ngrok-free.app).
+2) En Colab: panel 🔑 (Secrets) → agregá NGROK_AUTHTOKEN con tu token.
+3) Poné tu dominio en la variable DOMAIN del notebook Y en iniciar-colab.bat (OLLAMA_URL).
+```
+
+**Cada demo (2 pasos, cero copy-paste):**
+
+```text
+1) Abrí colab/generar_en_colab.ipynb → GPU (T4) → Entorno de ejecución → Ejecutar todo.
+2) En tu PC: doble clic en iniciar-colab.bat. Listo.
+```
+
+La respuesta aparece donde siempre: en la web app (`localhost:8000`) y en la terminal si
+corrés los scripts. Colab solo mueve el cómputo; el modelo 7b en GPU responde en pocos segundos.
+
+> Privacidad: con la Opción B los prompts corren en **tu propio Ollama** sobre una VM efímera de
+> Colab que se destruye al cerrar el runtime —ningún proveedor de inferencia ingiere los datos—,
+> a diferencia de una API hosted. No es 100 % offline como la Opción A, pero sí "tu modelo, VM
+> descartable". Para la demo conviene mostrar ambas: B para que se vea fluido, A como prod offline.
+
 > En CPU, cerrá apps pesadas y **pausá la sincronización de OneDrive** antes de la demo: con
 > 8 GB de RAM el margen es chico y el swap a disco ralentiza la inferencia.
+
+### Notebook integrador en Colab (autocontenida)
+
+`notebook.ipynb` corre de punta a punta en Google Colab **sin configuración extra**: subí la
+carpeta del proyecto a tu Drive, abrila con Colab (*Entorno de ejecución → GPU T4*) y *Ejecutar
+todo*. La celda 0 instala dependencias, levanta `qwen2.5` en la GPU de Colab y corre el pipeline
+completo (corpus → Chroma → retrieval → generación → evaluación con las 4 métricas). Si no hay
+GPU, degrada a modo solo-retrieval sin romperse.
 
 ---
 
@@ -135,7 +179,7 @@ iniciar.bat                                 # o uvicorn (ver arriba)
 
 - **Extracción:** `pdfplumber`.
 - **Base vectorial + embeddings:** `chromadb` (embedding por defecto all-MiniLM-L6-v2, local y offline).
-- **Generación:** LLM local vía **Ollama** (`phi4-mini`), configurable por `OLLAMA_MODEL`.
+- **Generación:** LLM vía **Ollama** (`qwen2.5:14b-instruct` en GPU; `phi4-mini` en CPU), configurable por `OLLAMA_MODEL`.
 
 ---
 

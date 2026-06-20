@@ -90,8 +90,8 @@
       pipeline RAG construido de punta a punta.</p>
     <div class="meta">
       <span><b>Grupo 14</b> Martin, Gentil, Natalichio, Cuenca, Ocampo, Aubert</span>
-      <span><b>Pipeline</b> pdfplumber → MiniLM → Chroma → Phi-4-mini (Ollama)</span>
-      <span><b>Entorno</b> local, offline, privado</span>
+      <span><b>Pipeline</b> pdfplumber → MiniLM → Chroma → qwen2.5:14B (Ollama)</span>
+      <span><b>Entorno</b> híbrido: pipeline local · generación en GPU (Colab)</span>
     </div>
   </header>
 
@@ -111,7 +111,7 @@
       de un corpus mixto, vectorización, análisis exploratorio, visualización, clustering,
       generación con control de tono y evaluación cuantitativa del anclaje (grounding).</p>
     <div class="kpis">
-      <div class="kpi"><b>418</b><span>documentos en el corpus</span></div>
+      <div class="kpi"><b>439</b><span>documentos en el corpus</span></div>
       <div class="kpi"><b>36</b><span>correlatividades parseadas</span></div>
       <div class="kpi"><b>6</b><span>generadores de artefactos</span></div>
       <div class="kpi"><b>3</b><span>tonos controlables</span></div>
@@ -128,18 +128,23 @@
       códigos institucionales no coinciden entre documentos, así que la clave de unión es el
       <i>nombre de materia normalizado</i> (minúsculas, sin tildes ni puntuación). Se parsearon
       las 36 obligatorias con sus correlativas, resolviendo casos borde como las integradoras,
-      cuyo nombre se parte en dos líneas. El corpus final tiene 418 documentos: 362 de estados
+      cuyo nombre se parte en dos líneas. El corpus final tiene 439 documentos: 383 de estados
       académicos, 36 de correlatividades y 20 chunks del plan.</p>
     <p>El historial de notas de exámenes usa los nombres del <b>Plan 2008</b>, mientras que el
       estado académico ya migró a los del <b>Plan 2023</b>. Para que el cruce no pierda notas
       aprobadas por equivalencia, incorporamos el <b>Anexo II</b> del plan (régimen de
       equivalencias 2008↔2023) como tabla de canonización de nombres: toda materia se lleva a su
-      nombre 2023 antes del join, con tolerancia a la truncación de nombres largos del PDF. Tras
-      esa normalización, las materias que quedan sin nota numérica son las de nivelación de
-      ingreso (año 0, sin nota) y las aún no cursadas, como corresponde.</p>
-    <p>El análisis exploratorio trabaja sobre <b>199 registros reales</b> de notas (una entrada por
+      nombre 2023 antes del join, con tolerancia a la truncación de nombres largos del PDF.</p>
+    <p>El export de exámenes resultó además <b>más completo que el estado académico</b>: contiene
+      materias aprobadas (con su nota) que ni siquiera figuran como fila en el estado. Esas materias
+      se incorporan al corpus como aprobadas, evitando que el planificador las recomiende como
+      pendientes. En paralelo, se distingue el estado real de cada materia &mdash;aprobada, en curso
+      (&laquo;cursando&raquo;, aún sin nota) o no iniciada&mdash; para que el plan de cursada excluya
+      lo que ya se está cursando y ofrezca, además de las obligatorias habilitadas, las electivas del
+      plan todavía disponibles.</p>
+    <p>El análisis exploratorio trabaja sobre <b>220 registros reales</b> de notas (una entrada por
       materia aprobada con calificación numérica), correspondientes a los seis integrantes. Los
-      promedios van de <b>7.9 a 8.7</b>, un grupo parejo y de buen rendimiento; las diferencias
+      promedios van de <b>8.0 a 8.7</b>, un grupo parejo y de buen rendimiento; las diferencias
       aparecen al desagregar por área temática, que es lo que explota el diagnóstico grupal.</p>
     <figure>
       <img src="../figs/notas_distribucion.png" alt="Distribución de notas por integrante">
@@ -161,7 +166,7 @@
     <pre>extract.py    PDF → texto (pdfplumber)
 documents.py  texto → documentos + correlatividades; normalizar() = clave de join
 ingest.py     corpus → Chroma; buscar() semántico + obtener() por metadata
-rag.py        chat() al LLM local (Phi-4-mini vía Ollama); fallback si está apagado
+rag.py        chat() al LLM (qwen2.5:14B vía Ollama, local o Colab); fallback si está apagado
 analisis.py   DataFrame de notas reales (6 integrantes) + agregaciones por área
 figuras.py    EDA, radar, clustering (KMeans/PCA), t-SNE de embeddings
 generar.py    6 generadores de artefactos con control de tono
@@ -170,17 +175,31 @@ evaluar.py    grounding léxico + semántico + comparar_con_sin_rag()</pre>
       offline). El retrieval tiene dos modos: <b>semántico</b> (similitud de embeddings, para
       lenguaje natural) y <b>determinístico</b> (por metadata, para anclar exactamente las
       materias aprobadas de un alumno y las correlatividades). La generación corre sobre
-      <b>Phi-4-mini (3.8B) vía Ollama</b>; si Ollama está apagado, la parte RAG sigue funcionando y
+      <b>qwen2.5:14B vía Ollama</b>; si Ollama está apagado, la parte RAG sigue funcionando y
       devuelve el contexto recuperado.</p>
+
+    <h3>Arquitectura de ejecución híbrida</h3>
+    <p>Todo el pipeline RAG &mdash;extracción, embeddings, base vectorial y recuperación&mdash; corre
+      <b>local</b> en la máquina del grupo. Lo único que cambia de lugar es la <b>generación del
+      LLM</b>: como `rag.py` consume Ollama por HTTP (variable <code>OLLAMA_URL</code>), el modelo
+      puede correr en la misma PC (CPU) o en una <b>GPU T4 gratuita de Google Colab</b>, expuesta por
+      un túnel de URL fija. Esto permite usar un modelo grande (14B) con respuestas en segundos sin
+      GPU propia, sin cambiar una línea del pipeline. Es una decisión de despliegue: en producción el
+      sistema corre 100% local y offline; para la demo se aprovecha la GPU remota. Los prompts nunca
+      pasan por un proveedor de inferencia de terceros &mdash;corren en una VM efímera del propio
+      grupo&mdash;, preservando la privacidad de los datos académicos.</p>
 
     <h3>Estrategia de prompting</h3>
     <p>El sistema instruye al modelo a usar <b>exclusivamente</b> el contexto recuperado y a no
-      inventar notas, materias ni correlatividades. El prompt entrega el contexto como datos
-      citables y una tarea concreta por artefacto. El <b>control de tono</b> (técnico,
-      motivacional, honesto) reescribe el mismo dato en distinto registro: es lo que hace al
-      sistema generativo y no un reporte fijo.</p>
-    <blockquote>"Generás artefactos personalizados usando exclusivamente los datos del contexto.
-      No inventes notas ni materias; si un dato no está en el contexto, no lo afirmes."</blockquote>
+      inventar notas, materias ni correlatividades, pero también a <b>interpretar y seleccionar</b>:
+      elegir los pocos datos relevantes y explicar qué revelan, en lugar de enumerar todas las notas.
+      Cada artefacto define una tarea concreta y una estructura esperada (por ejemplo, la carta de
+      pasantía exige primera persona, conectar fortalezas con competencias del puesto y no listar el
+      historial). El <b>control de tono</b> (técnico, motivacional, honesto) reescribe el mismo dato
+      en distinto registro: es lo que hace al sistema generativo y no un reporte fijo.</p>
+    <blockquote>"Trabajás solo con los datos del contexto: no inventes ni supongas. Pero no sos un
+      loro de datos: interpretá y seleccioná los datos relevantes y explicá qué revelan; nunca
+      enumeres todas las notas."</blockquote>
   </section>
 
   <section>
@@ -202,27 +221,37 @@ evaluar.py    grounding léxico + semántico + comparar_con_sin_rag()</pre>
 
   <section>
     <h2><span class="n">05</span>Evaluación: grounding con/sin RAG</h2>
-    <p>Medimos el anclaje con <b>dos métricas complementarias</b>. El <b>grounding léxico</b> es la
-      fracción de tokens informativos de la salida (nombres de materias y notas numéricas) que
-      aparecen literalmente en el contexto: explicable, pero penaliza la paráfrasis. El
-      <b>grounding semántico</b> promedia el máximo coseno entre cada oración de la salida y los
-      fragmentos del contexto (mismos embeddings MiniLM): reconoce la reformulación legítima que el
-      léxico castiga. En la validación, una afirmación anclada obtuvo grounding léxico <b>1.0</b>
-      (semántico 0.69) y una inventada <b>0.0</b> (semántico 0.34): ambas métricas separan lo
-      anclado de lo inventado.</p>
+    <p>Medimos el anclaje con <b>cuatro métricas sobre tres ejes</b>. <b>(a) Solapamiento:</b> el
+      <b>grounding léxico</b> es la fracción de tokens informativos de la salida (materias, notas)
+      presentes literalmente en el contexto &mdash;explicable, pero penaliza la paráfrasis&mdash; y
+      el <b>grounding semántico</b> promedia el máximo coseno entre cada oración de la salida y los
+      fragmentos del contexto (embeddings MiniLM), reconociendo la reformulación legítima.
+      <b>(b) Corrección factual:</b> la <b>precisión factual</b> extrae los pares (materia, nota)
+      que la salida afirma y verifica cada uno contra el registro real del alumno &mdash;mide acierto,
+      no cercanía&mdash;. <b>(c) Juicio de un LLM:</b> la <b>faithfulness</b> usa el propio modelo
+      como evaluador, puntuando de 0 a 1 cuánto se apoya la respuesta solo en el contexto.</p>
     <p>La <b>demo estrella</b> compara el mismo pedido <b>con RAG</b> (contexto real) contra
-      <b>sin RAG</b> (sin contexto). Sin el conocimiento privado, el modelo no puede anclar: se
-      generaliza o inventa, y el grounding cae. Promediando tres artefactos (plan de cursada,
-      recomendación de orientación e informe de trayectoria) con <b>Phi-4-mini</b> como modelo
-      generador, el grounding léxico pasa de <b>0.80 con RAG a 0.29 sin RAG</b>
-      &mdash;menos de la mitad&mdash; y el semántico de <b>0.64 a 0.52</b>. La brecha léxica es la
-      más elocuente: sin el contexto, la salida casi no menciona materias ni notas reales. Es la
-      evidencia medible de que el aporte del pipeline no es cosmético sino el corazón del producto.</p>
+      <b>sin RAG</b> (sin contexto). Promediando cuatro artefactos (plan de cursada, recomendación de
+      orientación, informe de trayectoria y carta de pasantía) con <b>qwen2.5:14B</b>, el resultado
+      más nítido es la <b>precisión factual</b>: con RAG es <b>1.0</b> &mdash;de cada par (materia,
+      nota) que el modelo afirma, el 100% coincide con el registro real: cero notas inventadas&mdash;
+      mientras que sin RAG el modelo no cita ningún dato verificable. La <b>faithfulness</b> juzgada
+      por el LLM cae de <b>0.73 con RAG a 0.50 sin RAG</b>, y el grounding de <b>0.55 a 0.36</b>
+      (léxico) y <b>0.57 a 0.51</b> (semántico). En las cuatro métricas, con RAG &gt; sin RAG: la
+      evidencia medible de que el conocimiento privado es el corazón del producto, no un adorno.</p>
+    <p>Vale una lectura crítica. El grounding léxico <b>premia la cita literal</b>: un artefacto
+      profesional que parafrasea e interpreta (como la carta, que por diseño <i>no</i> enumera notas)
+      obtiene un léxico más bajo aun siendo correcto &mdash;por eso ronda 0.5 y no 1&mdash;; es la
+      razón por la que sumamos la precisión factual, que sí mide acierto. Además, como la generación
+      es estocástica, el valor absoluto de una corrida tiene <b>varianza</b> (entre corridas el léxico
+      osciló ~0.55&ndash;0.64); lo robusto es la <b>dirección</b> (con RAG &gt; sin RAG en las cuatro
+      métricas) y la precisión factual de 1.0. Limitación de fondo: ninguna métrica detecta
+      <i>contradicciones</i> lógicas sutiles, solo cercanía, corrección de pares y un juicio agregado.</p>
     <div class="kpis">
-      <div class="kpi"><b>0.80</b><span>grounding léxico CON RAG</span></div>
-      <div class="kpi"><b>0.29</b><span>grounding léxico SIN RAG</span></div>
-      <div class="kpi"><b>0.64</b><span>grounding semántico CON RAG</span></div>
-      <div class="kpi"><b>0.52</b><span>grounding semántico SIN RAG</span></div>
+      <div class="kpi"><b>1.0</b><span>precisión factual CON RAG (pares materia-nota correctos)</span></div>
+      <div class="kpi"><b>0.73<span style="font-size:18px;color:var(--ink-soft)"> / 0.50</span></b><span>faithfulness (juez LLM) con / sin RAG</span></div>
+      <div class="kpi"><b>0.55<span style="font-size:18px;color:var(--ink-soft)"> / 0.36</span></b><span>grounding léxico con / sin RAG</span></div>
+      <div class="kpi"><b>0.57<span style="font-size:18px;color:var(--ink-soft)"> / 0.51</span></b><span>grounding semántico con / sin RAG</span></div>
     </div>
   </section>
 
@@ -233,17 +262,18 @@ evaluar.py    grounding léxico + semántico + comparar_con_sin_rag()</pre>
       hacen visible y medible el valor del conocimiento privado.</p>
     <h3>Limitaciones</h3>
     <p>El grounding, aun en su versión semántica, no detecta <i>contradicciones</i> sutiles: mide
-      cercanía con el contexto, no consistencia lógica con él. El recomendador por matching se
-      apoya en nombres de materias y correlativas, no en las descripciones reales de cada cátedra.
-      Y el modelo local elegido, <b>Phi-4-mini (3.8B)</b>, logra una redacción notablemente más
-      fluida que modelos más chicos manteniéndose offline y reproducible; aun así, por su tamaño
-      puede deslizar imprecisiones puntuales (matizar una nota, nombrar de más), que el grounding y
-      el retrieval determinístico por metadata ayudan a acotar.</p>
+      cercanía con el contexto, no consistencia lógica con él; mide densidad de datos citados, no
+      corrección del razonamiento. El recomendador por matching se apoya en nombres de materias y
+      correlativas, no en las descripciones reales de cada cátedra. Y la generación, anclada en el
+      contexto y acotada por el retrieval determinístico por metadata, puede aun así deslizar
+      matices imprecisos que solo una verificación de consistencia detectaría.</p>
     <h3>Trabajo futuro</h3>
     <p>Incorporar las descripciones de cátedras y electivas al corpus para que el recomendador
-      compare contenidos y no solo nombres; sumar al grounding una verificación de consistencia
-      (detección de contradicciones, no solo de cercanía); y ofrecer una corrida opcional con un
-      modelo más grande en una máquina con GPU, dejando Phi-4-mini como base local reproducible.</p>
+      compare contenidos y no solo nombres; reforzar la evaluación con métricas de RAG más finas
+      &mdash;<i>faithfulness</i> y <i>answer/context relevancy</i> con un LLM como juez, o precisión
+      de recuperación (hit-rate / MRR) sobre el retriever&mdash; que capturen consistencia y no solo
+      cercanía léxica; y consolidar la arquitectura híbrida (modelo grande en GPU para la demo, base
+      local reproducible para producción).</p>
     <p class="muted" style="margin-top:var(--s4)">El código, el notebook integrador y la web app
       de demostración en vivo acompañan este informe como entregables ejecutables.</p>
   </section>

@@ -13,3 +13,6 @@ Conformacion de Grupos*.xlsx
 # Artefactos temporales de pruebas/logs (no son entregables)
 scripts/_*
 *.log
+
+# Secretos (authtoken ngrok, dominio): NUNCA versionar
+secrets.md

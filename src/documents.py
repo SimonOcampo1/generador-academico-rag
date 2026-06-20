@@ -70,6 +70,24 @@ def _buscar_nota(nombre: str, notas: dict[str, int]) -> int | None:
             return v
     return None
 
+
+def _match_prefijo(clave: str, candidatos) -> str | None:
+    """Match tolerante SOLO a la truncación del PDF (~40 chars), no a prefijos de otra materia.
+
+    El PDF corta los nombres largos, así que el truncado es prefijo del completo con muy pocos
+    chars de diferencia. Un umbral chico (<=4) evita confundir 'Desarrollo de Software' con
+    'Desarrollo de Software Cloud' (materias distintas) o cualquier 'Administración de ...'.
+    """
+    if clave in candidatos:
+        return clave
+    mejor, mejor_gap = None, 99
+    for c in candidatos:
+        corto, largo = (clave, c) if len(clave) <= len(c) else (c, clave)
+        gap = len(largo) - len(corto)
+        if largo.startswith(corto) and gap <= 4 and gap < mejor_gap:
+            mejor, mejor_gap = c, gap
+    return mejor
+
 # "0 Física 6 Aprobada en 2022 2016"
 # "1 Algoritmos y Estructuras de Datos 106 Aprobada con 8 (5 hs.) Tomo: 386 Folio: 2 2023"
 # "3 Responsabilidad Social e Institucional ( 331 2023"   (sin estado)
@@ -105,7 +123,8 @@ def notas_de_examenes(texto: str) -> dict[str, int]:
     return notas
 
 
-def documentos_estado(texto: str, alumno: str, notas_examenes: dict[str, int] | None = None) -> list[dict]:
+def documentos_estado(texto: str, alumno: str, notas_examenes: dict[str, int] | None = None,
+                      nombres_plan: dict[str, str] | None = None) -> list[dict]:
     """Una línea de materia -> un documento por materia."""
     docs: list[dict] = []
     for linea in texto.splitlines():
@@ -140,6 +159,28 @@ def documentos_estado(texto: str, alumno: str, notas_examenes: dict[str, int] | 
                 "estado": estado,
             },
         })
+
+    # Materias aprobadas que figuran en Notas-*.pdf pero NO tienen fila en el estado académico
+    # (el export de notas es más completo): se perdían por completo. Se agregan como aprobadas
+    # con su nota numérica. anio=0 = año de carrera no disponible en el export de notas.
+    if notas_examenes:
+        nombres_plan = nombres_plan or {}
+        presentes = {canon(d["metadata"]["materia"]) for d in docs}
+        for clave, nota in notas_examenes.items():
+            if _match_prefijo(clave, presentes):
+                continue  # ya está en el estado (su nota se enriqueció arriba)
+            kp = _match_prefijo(clave, nombres_plan)  # nombre legible del plan 2023 si es obligatoria
+            nombre = nombres_plan[kp] if kp else clave.title()
+            docs.append({
+                "id": f"estado-{alumno.lower().split()[0]}-nota-{canon(nombre)[:24].replace(' ', '_')}",
+                "text": (f"{alumno}, en la carrera Ingeniería en Sistemas de Información (Plan 2023), "
+                         f"aprobó la materia '{nombre}' con nota {nota}."),
+                "metadata": {
+                    "fuente": "estado_academico", "alumno": alumno, "materia": nombre,
+                    "codigo": "", "anio": 0, "nota": nota,
+                    "estado": f"Aprobada con {nota} (registrada en el acta de exámenes)",
+                },
+            })
     return docs
 
 
@@ -291,18 +332,23 @@ def construir_corpus() -> list[dict]:
     Notas-<alumno>.pdf correspondiente, lo usa para enriquecer notas faltantes.
     """
     docs: list[dict] = []
+    # Plan primero: sus nombres canónicos (2023) sirven para nombrar prolijo las materias que
+    # vienen sólo del export de notas (con nombre 2008 y a veces truncado).
+    plan_path = RAW_DIR / "Plan-Sistemas-2023.pdf"
+    texto_plan = pdf_to_text(plan_path) if plan_path.exists() else None
+    plan_corr = parsear_correlatividades(texto_plan) if texto_plan else {}
+    nombres_plan = {canon(d["nombre"]): d["nombre"] for d in plan_corr.values()}
+
     for estado_pdf in sorted(RAW_DIR.glob("Estado-Academico-*.pdf")):
         texto = pdf_to_text(estado_pdf)
         alumno = nombre_alumno(texto)
         sufijo = estado_pdf.stem.split("-")[-1]  # 'Simon', 'Santi'
         notas_pdf = RAW_DIR / f"Notas-{sufijo}.pdf"
         notas = notas_de_examenes(pdf_to_text(notas_pdf)) if notas_pdf.exists() else None
-        docs += documentos_estado(texto, alumno=alumno, notas_examenes=notas)
-    plan = RAW_DIR / "Plan-Sistemas-2023.pdf"
-    if plan.exists():
-        texto_plan = pdf_to_text(plan)
+        docs += documentos_estado(texto, alumno=alumno, notas_examenes=notas, nombres_plan=nombres_plan)
+    if texto_plan:
         docs += documentos_plan(texto_plan)
-        docs += documentos_correlatividades(parsear_correlatividades(texto_plan))
+        docs += documentos_correlatividades(plan_corr)
     return docs
 
 

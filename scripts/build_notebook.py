@@ -31,22 +31,53 @@ texto nuevo sintetizado, no un campo de una tabla.
 ```
 PDFs ──pdfplumber──▶ documentos (estructurado + no estructurado)
      ──MiniLM──▶ embeddings ──▶ Chroma (base vectorial)
-     ──retrieval top-k──▶ contexto ──▶ Phi-4-mini (Ollama) ──▶ artefacto
+     ──retrieval top-k──▶ contexto ──▶ qwen2.5:14B (Ollama) ──▶ artefacto
 ```
-Local, offline, privado. Si Ollama está apagado, la parte RAG funciona igual (recupera el
-contexto) y la generación se completa al encender el modelo.
+El pipeline RAG corre **local**; la **generación** corre en una GPU (en Colab, la T4 gratuita).
+Si el LLM está apagado, la parte RAG funciona igual (recupera el contexto) y la generación se
+completa al encender el modelo.
 """)
 
-md("## 0 · Setup\nTodo el código vive en `src/`. Cada módulo tiene self-checks; acá los orquestamos.")
-code(r"""
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path.cwd() / "src"))  # importar los módulos del proyecto
+md(r"""
+## 0 · Setup
 
+Esta celda prepara el entorno. **En Google Colab** (recomendado: *Entorno de ejecución → GPU T4*)
+instala las dependencias y levanta el modelo en la GPU para ver la generación en vivo. **En local**
+con el repo clonado, solo agrega `src/` al path.
+
+> Requisito: el notebook se corre **dentro del proyecto** (con `src/` y `data/raw/`). En Colab,
+> subí la carpeta del proyecto a tu Drive y abrí este `.ipynb` desde ahí, o cloná el repo.
+""")
+code(r"""
+import os, sys, subprocess, time
+from pathlib import Path
+
+EN_COLAB = "google.colab" in sys.modules
+
+if not Path("src").exists():
+    raise RuntimeError(
+        "No encuentro 'src/'. Corré este notebook DESDE la carpeta del proyecto "
+        "(con src/ y data/raw/). En Colab: subí el proyecto a Drive y abrí el .ipynb desde ahí.")
+
+if EN_COLAB:
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", "requirements.txt"])
+    # LLM en la GPU de Colab para ver la generación. Si falla (sin GPU), seguimos en solo-retrieval.
+    MODELO = os.environ.get("OLLAMA_MODEL", "qwen2.5:7b-instruct")  # 7B = rápido; 14B para mejor calidad
+    try:
+        subprocess.run("apt-get -qq install -y zstd pciutils", shell=True, check=True)
+        subprocess.run("curl -fsSL https://ollama.com/install.sh | sh", shell=True, check=True)
+        os.environ["OLLAMA_HOST"] = "0.0.0.0:11434"
+        subprocess.Popen(["ollama", "serve"]); time.sleep(5)
+        subprocess.run(["ollama", "pull", MODELO], check=True)
+        os.environ["OLLAMA_MODEL"] = MODELO
+    except Exception as e:
+        print("No se pudo levantar Ollama en Colab (¿sin GPU?); sigo en modo solo-retrieval:", e)
+
+sys.path.insert(0, str(Path.cwd() / "src"))  # importar los módulos del proyecto
 import analisis, documents, extract, figuras, generar, ingest, rag, evaluar
 from IPython.display import Image, display
 
-print("Ollama:", "ENCENDIDO" if rag.ollama_disponible() else "apagado (modo solo-retrieval)")
+print("Modelo:", rag.OLLAMA_MODEL, "|", "ENCENDIDO" if rag.ollama_disponible() else "apagado (solo-retrieval)")
 """)
 
 md(r"""
@@ -162,34 +193,43 @@ else:
 """)
 
 md(r"""
-## 8 · Evaluación — grounding con/sin RAG (demo estrella)
-Medimos el anclaje de la salida con **dos métricas complementarias**:
-- **Grounding léxico**: fracción de los tokens informativos de la salida (nombres de materias,
-  notas) que aparecen literalmente en el contexto real. Explicable, pero penaliza paráfrasis.
-- **Grounding semántico**: promedio del máximo coseno entre cada oración de la salida y los
-  fragmentos del contexto (mismos embeddings MiniLM). Reconoce la paráfrasis legítima.
+## 8 · Evaluación — con/sin RAG (demo estrella)
+Medimos el anclaje con **cuatro métricas sobre tres ejes**:
+- **Solapamiento** — *grounding léxico* (fracción de tokens informativos de la salida presentes
+  literalmente en el contexto; penaliza paráfrasis) y *grounding semántico* (máximo coseno de
+  embeddings salida↔contexto; reconoce la reformulación legítima).
+- **Corrección factual** — *precisión factual*: extrae los pares (materia, nota) que la salida
+  afirma y verifica cada uno contra el registro real del alumno. Mide acierto, no cercanía.
+- **Juicio de un LLM** — *faithfulness*: el propio modelo puntúa 0–1 cuánto se apoya la respuesta
+  solo en el contexto (LLM-as-judge).
 
-El mismo pedido CON RAG (contexto real) vs SIN RAG (sin contexto) hace medible el aporte del
-conocimiento privado: sin él, el modelo no puede anclar y ambos groundings caen.
+El mismo pedido CON RAG vs SIN RAG hace medible el aporte del conocimiento privado.
 """)
 code(r"""
+# Validación rápida de las métricas léxica/factual sobre un caso de juguete (no requiere LLM)
 contexto = ("- Simón Ocampo aprobó Bases de Datos con 9 en el año 3.\n"
             "- Simón Ocampo aprobó Análisis Matemático I con 9 en el año 1.")
-anclada = "Simón rindió Bases de Datos con 9 y Análisis Matemático con 9, muy buen desempeño."
+anclada = "Simón rindió Bases de Datos con 9 y Análisis Matemático I con 9, muy buen desempeño."
 inventada = "Recomiendo cursar Astrofísica Cuántica y Derecho Romano el próximo cuatrimestre."
-print("léxico   — anclada:", evaluar.grounding_score(anclada, contexto),
+print("léxico    — anclada:", evaluar.grounding_score(anclada, contexto),
       "| inventada:", evaluar.grounding_score(inventada, contexto))
-print("semántico — anclada:", evaluar.grounding_semantico(anclada, contexto),
-      "| inventada:", evaluar.grounding_semantico(inventada, contexto))
-
+registro = {"bases de datos": 9, "analisis matematico i": 9}
+print("precisión — anclada:", evaluar.precision_factual(anclada, registro)["precision"],
+      "| inventada:", evaluar.precision_factual(inventada, registro))
+""")
+code(r"""
+# Demo estrella CON vs SIN RAG sobre un artefacto real (requiere el LLM encendido)
 if rag.ollama_disponible():
-    cmp = evaluar.comparar_con_sin_rag(generar.plan_cursada, alumno="Simón Ocampo")
-    print(f"\n[plan_cursada] grounding léxico   CON RAG = {cmp['con_rag']['grounding']}"
-          f"  ·  SIN RAG = {cmp['sin_rag']['grounding']}")
-    print(f"[plan_cursada] grounding semántico CON RAG = {cmp['con_rag']['grounding_sem']}"
-          f"  ·  SIN RAG = {cmp['sin_rag']['grounding_sem']}")
+    cmp = evaluar.comparar_con_sin_rag(generar.recomendar_orientacion, alumno="Mora Gentil")
+    con, sin = cmp["con_rag"], cmp["sin_rag"]
+    pf = (con.get("precision_factual") or {}).get("precision")
+    print(f"grounding léxico    CON={con['grounding']}  SIN={sin['grounding']}")
+    print(f"grounding semántico CON={con['grounding_sem']}  SIN={sin['grounding_sem']}")
+    print(f"precisión factual   CON={pf}  SIN={(sin.get('precision_factual') or {}).get('precision')}")
+    print(f"faithfulness (juez) CON={con.get('faithfulness')}  SIN={sin.get('faithfulness')}")
+    print("\nResultados agregados (4 artefactos) en data/eval_resultados.json; ver scripts/run_eval.py")
 else:
-    print("\n(Ollama apagado) Encendé el modelo para la comparación con/sin RAG sobre un artefacto real.")
+    print("(LLM apagado) Encendé el modelo (celda 0 en Colab) para la comparación con/sin RAG.")
 """)
 
 md(r"""
@@ -198,12 +238,13 @@ md(r"""
   retrieval, generación) en vez de usar una caja negra.
 - El sistema **genera** artefactos personalizados con tono, no responde preguntas: cada salida
   es contenido nuevo anclado en datos privados.
-- La **demo con/sin RAG** y el **grounding** hacen medible y visible el aporte del conocimiento
-  privado: sin él, el modelo no puede anclar y la calidad cae.
+- La **demo con/sin RAG** y las **cuatro métricas** (léxico, semántico, precisión factual y
+  faithfulness) hacen medible el aporte del conocimiento privado: con RAG la precisión factual es
+  1.0 (cero notas inventadas); sin RAG el modelo no puede anclar.
 - Pipeline de Ciencia de Datos completo: EDA, visualización, clustering y evaluación.
 
-La web app (`iniciar.bat`) permite probar todo esto en vivo, con la consola de contexto y el
-medidor de grounding en tiempo real.
+La web app (`iniciar.bat` local, o `iniciar-colab.bat` apuntando a la GPU de Colab) permite probar
+todo esto en vivo, con la consola de contexto y el medidor de grounding en tiempo real.
 """)
 
 nb["cells"] = cells
