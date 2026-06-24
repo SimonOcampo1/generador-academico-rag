@@ -1,7 +1,8 @@
-"""Capa de análisis: del corpus a un DataFrame de notas de los 6 integrantes del grupo.
+"""Capa de análisis: de la base relacional a un DataFrame de notas de los 6 integrantes.
 
-Todos los datos son REALES: salen de los estados académicos + exámenes de los 6 integrantes,
-parseados por documents.construir_corpus (auto-descubre Estado-Academico-*.pdf y Notas-*.pdf).
+Todos los datos son REALES: el historial académico vive en la base relacional (db.py, cargada
+desde los estados académicos + exámenes de los 6 integrantes). El EDA consulta esa base —los
+datos tabulares se analizan donde corresponde, no en la vectorial.
 
 Áreas temáticas (para EDA, radar y clustering): mapeo de las 36 obligatorias del plan 2023.
 """
@@ -9,7 +10,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from documents import construir_corpus, normalizar, parsear_correlatividades
+import db
+from documents import normalizar, parsear_correlatividades
 from extract import pdf_to_text
 from documents import RAW_DIR
 
@@ -39,20 +41,22 @@ def area_de(materia: str, _cache: dict = {}) -> str:
 
 # --- Tabla de estudiantes reales (desde el corpus) -------------------------
 def tabla_real() -> pd.DataFrame:
-    """Un registro por (alumno, materia) con nota, año y área, solo materias con nota."""
-    filas = []
-    for d in construir_corpus():
-        m = d["metadata"]
-        if m["fuente"] != "estado_academico" or m["nota"] < 0:
-            continue
-        filas.append({
-            "alumno": m["alumno"],
-            "materia": m["materia"],
-            "anio": m["anio"],
-            "nota": m["nota"],
-            "area": area_de(m["materia"]),
+    """Un registro por (alumno, materia) con nota, año y área, solo materias con nota.
+
+    Lee de la base relacional (db.todas_aprobadas); la construye si todavía no existe.
+    """
+    db.asegurar()
+    filas = [
+        {
+            "alumno": r["alumno"],
+            "materia": r["materia"],
+            "anio": r["anio"],
+            "nota": r["nota"],
+            "area": area_de(r["materia"]),
             "sintetico": False,
-        })
+        }
+        for r in db.todas_aprobadas()
+    ]
     return pd.DataFrame(filas)
 
 

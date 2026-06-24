@@ -13,15 +13,17 @@
 
 ## Objetivo y alcance (concreto)
 
-**Objetivo.** Construir un sistema de IA generativa que, alimentado por una base vectorial
-con el historial académico del grupo + documentación de la carrera, **genere artefactos
-académicos personalizados** (planes de cursada, informes de trayectoria, perfiles para
-pasantías, simulaciones) imposibles de producir sin ese conocimiento privado.
+**Objetivo.** Construir un sistema de IA generativa que, alimentado por **dos bases de datos**
+—una relacional con el historial académico del grupo + correlatividades, y una vectorial con la
+documentación de la carrera— **genere artefactos académicos personalizados** (planes de cursada,
+informes de trayectoria, perfiles para pasantías, simulaciones) imposibles de producir sin ese
+conocimiento privado.
 
 **Alcance (lo que SÍ hace).**
-- Ingesta de un corpus mixto: estructurado (notas, fechas de aprobación, correlativas,
-  promedio) + **no estructurado** (programas de materias, descripciones de cátedras).
-- Pipeline RAG propio: chunking → embeddings (MiniLM) → Chroma → retrieval → Phi-4-mini.
+- Ingesta de un corpus mixto con **persistencia híbrida**: lo estructurado (notas, fechas,
+  correlativas, promedio) en una base **relacional** (SQLite); lo **no estructurado** (prosa del
+  plan, descripciones de cátedras) en una base **vectorial** (Chroma).
+- Pipeline RAG propio: parseo → (SQLite + embeddings MiniLM/Chroma) → retrieval híbrido → Phi-4-mini.
 - Generación de los artefactos de abajo, con **tono controlable**.
 - EDA + visualización del avance académico + clustering de perfiles.
 - Evaluación: grounding (¿la salida usa datos reales del RAG?) + contraste con/sin RAG.
@@ -84,7 +86,7 @@ sabemos armar el pipeline RAG** y usarlo para generar. NotebookLM no demuestra e
 ## Reutilización y esfuerzo
 
 - **Reutilizamos:** Ollama+Phi-4-mini, web app con consola en vivo, MiniLM, evaluación, notebook/informe/slides.
-- **Agregamos:** Chroma + chunking + retrieval + los generadores de artefactos.
+- **Agregamos:** SQLite (relacional) + Chroma (vectorial) + chunking + retrieval híbrido + los generadores de artefactos.
 - **Esfuerzo:** bajo-medio. El dato es poco; lo nuevo es el pipeline RAG (igual para cualquier propuesta).
 - **Riesgo:** notas reales → podemos anonimizar nombres si alguien prefiere.
 

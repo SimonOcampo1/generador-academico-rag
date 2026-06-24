@@ -2,51 +2,60 @@
 
 **Del PDF frío del campus a una respuesta que razona sobre tu carrera.**
 
-Sistema de IA generativa que se alimenta de una **base de datos vectorial** con el historial
-académico real del grupo (notas, materias, fechas) más la documentación de la carrera (plan
-de estudios, correlatividades) y **genera** artefactos personalizados —planes de cursada,
-informes de trayectoria, recomendaciones de electivas— que el modelo **no podría producir sin
-ese conocimiento privado**. Proyecto integrador de Ciencia de Datos (UTN FRLP, 2026).
+Sistema de IA generativa con **persistencia híbrida**: una **base relacional** (SQLite) con el
+historial académico real del grupo (notas, materias, años) y las correlatividades del plan, y una
+**base vectorial** (Chroma) con la documentación de la carrera. Combinando ambas, **genera**
+artefactos personalizados —planes de cursada, informes de trayectoria, recomendaciones de
+electivas— que el modelo **no podría producir sin ese conocimiento privado**. Proyecto integrador
+de Ciencia de Datos (UTN FRLP, 2026).
 
 ---
 
 ## 🎯 Por qué este proyecto
 
 El modelo no conoce nuestras notas ni el régimen de correlatividades de la UTN FRLP: son
-datos privados/de nicho. Sin la base vectorial **no puede responder**; con ella **genera**
+datos privados/de nicho. Sin esas bases **no puede responder**; con ellas **genera**
 respuestas concretas y citadas. El RAG no es un adorno: es el corazón del sistema.
 
-- **No es un buscador SQL.** El corpus mezcla datos **estructurados** (notas, fechas) con
-  **texto libre** (plan, correlatividades). El matching semántico de los embeddings hace lo
-  que un `SELECT` no puede.
-- **No es NotebookLM.** El entregable es **construir el pipeline RAG nosotros** (chunking →
-  embeddings → base vectorial → retrieval → generación) y sumarle análisis y visualización.
+- **Cada dato en la base que le corresponde.** Lo **tabular** (notas, años, correlatividades)
+  vive en una base **relacional** (lookup/join exacto, no semántica); la **documentación** del
+  plan —texto largo— vive en la base **vectorial**, donde los embeddings hacen lo que un `SELECT`
+  no puede. El agente **combina ambas** para su contexto.
+- **No es NotebookLM.** El entregable es **construir el pipeline RAG nosotros** (parseo →
+  persistencia híbrida → retrieval combinado → generación) y sumarle análisis y visualización.
 
 ---
 
 ## 🧠 Cómo funciona
 
 ```
-PDFs (plan + estados académicos) → extracción → documentos → embeddings (MiniLM)
-   → Chroma (vector DB) → retrieval top-k → Phi-4-mini (Ollama) → respuesta citada
+                        ┌─ tabular (notas, correlativas) → SQLite (relacional) ─┐
+PDFs → extracción → docs ┤                                                      ├─ contexto
+                        └─ prosa del plan → embeddings (MiniLM) → Chroma (vector)┘  combinado
+                                                                                   → Phi-4-mini
+                                                                                     (Ollama)
+                                                                                   → respuesta
 ```
 
-El estado académico se convierte en **un documento por materia** (hecho atómico); el plan se
-parte en **chunks** de texto libre. La generación se ancla solo en lo recuperado.
+El estado académico y las correlatividades se cargan como **filas** en SQLite (datos tabulares);
+el plan se parte en **chunks** de texto libre en Chroma. El retrieval combina lookup relacional +
+búsqueda semántica, y la generación se ancla solo en lo recuperado.
 
 ---
 
 ## 📂 Estructura
 
 ```
-data/raw/         PDFs fuente (plan de estudios, estados académicos, notas)
-data/chroma/      base vectorial persistente (se genera; ignorada por git)
+data/raw/         PDFs fuente (plan, estados académicos, notas, diseño curricular Ord. 1877)
+data/academico.db base RELACIONAL SQLite (historial + correlatividades; se genera, ignorada por git)
+data/chroma/      base VECTORIAL persistente (documentación del plan; se genera, ignorada por git)
 src/
   extract.py      PDF → texto (pdfplumber)
-  documents.py    texto → documentos (estado: 1 por materia · plan: chunks)
-  ingest.py       documentos → embeddings → Chroma + búsqueda semántica
-  rag.py          retrieval → Phi-4-mini (Ollama) → respuesta
-  analisis.py     DataFrame de notas reales (6 integrantes) + agregaciones por área (EDA)
+  documents.py    texto → documentos (estado: 1 por materia · correlativas · plan: chunks · fichas de materia)
+  db.py           datos tabulares → SQLite (relacional) + consultas SQL (historial, correlativas)
+  ingest.py       prosa del plan + contenidos de materias → embeddings → Chroma + búsqueda semántica
+  rag.py          retrieval HÍBRIDO (SQL + vector) → Phi-4-mini (Ollama) → respuesta
+  analisis.py     DataFrame de notas reales (6 integrantes, desde SQLite) + agregaciones (EDA)
   figuras.py      EDA, radar, clustering (KMeans/PCA), t-SNE de embeddings → figs/
   generar.py      6 generadores de artefactos con control de tono
   evaluar.py      grounding léxico + semántico + comparar_con_sin_rag() (demo estrella)
@@ -70,9 +79,10 @@ docs/             propuesta, mail y notas de diseño del proyecto
 python -m venv .venv && .venv\Scripts\activate      # Windows
 pip install -r requirements.txt
 
-python src/documents.py    # ver el corpus parseado (sin base vectorial)
-python src/ingest.py       # construir la base vectorial + probar retrieval
-python src/rag.py          # generar una respuesta (requiere Ollama; si no, muestra el contexto)
+python src/documents.py    # ver el corpus parseado (sin persistir)
+python src/db.py           # construir la base RELACIONAL (SQLite) + probar consultas
+python src/ingest.py       # construir la base VECTORIAL (Chroma) + probar retrieval
+python src/rag.py          # respuesta híbrida (relacional + vector; requiere Ollama, si no muestra contexto)
 ```
 
 **Web app (demo en vivo):** doble clic en `iniciar.bat` (enciende Ollama + levanta la app +
@@ -81,6 +91,13 @@ abre el navegador), o manual:
 ```bash
 python -m uvicorn app.main:app --port 8000   # http://localhost:8000
 ```
+
+> **Portabilidad entre máquinas (OneDrive).** Los lanzadores (`iniciar.bat` / `iniciar-colab.bat`)
+> crean su propio entorno Python en `%LOCALAPPDATA%\generador-academico-rag-venv` —**fuera** de
+> OneDrive— e instalan las dependencias la primera vez en cada máquina (`scripts/setup-venv.bat`).
+> Así el proyecto funciona en notebook y escritorio sin recrear nada: un venv dentro de OneDrive se
+> sincroniza pero queda atado al intérprete de la PC que lo creó y se rompe en la otra. Si tenés un
+> `.venv` viejo en la carpeta del proyecto, podés borrarlo: ya no se usa.
 
 **Regenerar entregables:**
 
@@ -122,13 +139,13 @@ El pipeline RAG (extracción, embeddings, Chroma, retrieval) corre siempre local
 Todo offline y privado en una sola máquina. Setup en la máquina con GPU:
 
 ```bash
-# 1) Clonar/copiar el repo (data/raw/ ya trae los PDFs → la base Chroma se reconstruye sola)
+# 1) Clonar/copiar el repo (data/raw/ ya trae los PDFs → ambas bases se reconstruyen solas)
 # 2) Instalar Ollama (detecta la GPU NVIDIA automáticamente, sin configuración)
 ollama pull qwen2.5:7b-instruct
 # 3) Entorno Python
 python -m venv .venv && .venv\Scripts\activate
 pip install -r requirements.txt
-python src/ingest.py                       # reconstruye la base vectorial
+python src/db.py && python src/ingest.py    # reconstruye la base relacional + la vectorial
 set OLLAMA_MODEL=qwen2.5:7b-instruct        # o editá iniciar.bat
 iniciar.bat                                 # o uvicorn (ver arriba)
 ```
@@ -167,25 +184,26 @@ corrés los scripts. Colab solo mueve el cómputo; el modelo 7b en GPU responde 
 
 ### Notebook integrador en Colab (autocontenida)
 
-`notebook.ipynb` **ya viene ejecutada de punta a punta**: se puede abrir y revisar todas las
-salidas (tablas, figuras, artefactos, métricas) sin correr nada.
+`notebook.ipynb` recorre el pipeline de punta a punta y se reproduce con *Ejecutar todo*
+(en Colab con GPU T4 se ven también las generaciones del LLM).
 
-Para reproducirla en Google Colab: subí `notebook.ipynb`, elegí *Entorno de ejecución → GPU T4*
+Para correrla en Google Colab: subí `notebook.ipynb`, elegí *Entorno de ejecución → GPU T4*
 y *Ejecutar todo*. La 2ª celda detecta Colab y pide subir el zip de la entrega
 (`Entrega-Grupo14-GeneradorAcademico.zip`); lo descomprime sola, sin editar nada. Después la celda
 de setup instala dependencias, levanta `qwen2.5:14b-instruct` en la GPU y corre el pipeline
-completo (corpus → Chroma → retrieval → generación → evaluación con las 4 métricas).
+completo (corpus → SQLite + Chroma → retrieval híbrido → generación → evaluación con las 4 métricas).
 
 Es **completamente funcional sin GPU**: si no hay modelo disponible, el pipeline RAG (extracción,
-embeddings, Chroma, retrieval, EDA, clustering y métricas) corre igual en modo solo-retrieval; lo
-único que requiere GPU es la generación del texto del LLM.
+persistencia relacional + vectorial, retrieval, EDA, clustering y métricas) corre igual en modo
+solo-retrieval; lo único que requiere GPU es la generación del texto del LLM.
 
 ---
 
 ## 🛠️ Stack
 
 - **Extracción:** `pdfplumber`.
-- **Base vectorial + embeddings:** `chromadb` (embedding por defecto all-MiniLM-L6-v2, local y offline).
+- **Base relacional:** `sqlite3` (stdlib): historial académico + correlatividades (datos tabulares).
+- **Base vectorial + embeddings:** `chromadb` (embedding por defecto all-MiniLM-L6-v2, local y offline): documentación del plan.
 - **Generación:** LLM vía **Ollama** (`qwen2.5:14b-instruct` en GPU; `phi4-mini` en CPU), configurable por `OLLAMA_MODEL`.
 
 ---
@@ -194,9 +212,10 @@ embeddings, Chroma, retrieval, EDA, clustering y métricas) corre igual en modo 
 
 - [x] Extracción de PDFs (plan + estado académico) — verificada, texto digital limpio.
 - [x] Documentos estructurados (1 por materia, con notas) + chunks del plan.
-- [x] Base vectorial Chroma + retrieval semántico.
-- [x] Generación RAG con Ollama (con fallback a solo-retrieval).
-- [x] Parsear correlatividades a documentos por materia (36 obligatorias, join por nombre).
+- [x] **Persistencia híbrida**: datos tabulares (historial + correlatividades) en SQLite (relacional); documentación del plan en Chroma (vectorial).
+- [x] Retrieval combinado (lookup SQL + búsqueda semántica) + generación RAG con Ollama (fallback a solo-retrieval).
+- [x] Fichas de las 36 materias (contenidos mínimos, Ord. 1877) en la vectorial → recomendador que cita contenidos reales, no solo nombres.
+- [x] Parsear correlatividades a tabla relacional (36 obligatorias, join por nombre).
 - [x] Datos reales de los 6 integrantes del grupo + EDA + visualización + clustering.
 - [x] 6 generadores de artefactos con control de tono.
 - [x] Evaluación: grounding léxico + semántico + demo con/sin RAG.

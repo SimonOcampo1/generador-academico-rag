@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 import analisis  # noqa: E402
+import db  # noqa: E402
 import generar  # noqa: E402
 import rag  # noqa: E402
 from evaluar import grounding_score  # noqa: E402
@@ -57,9 +58,14 @@ _SIN_RAG_SYSTEM = "Sos un asistente académico. Respondé el pedido lo mejor que
 
 @app.on_event("startup")
 def _ensure_index():
+    # Base relacional (datos tabulares) + base vectorial (documentación del plan).
+    try:
+        db.asegurar()
+    except Exception as e:  # noqa: BLE001
+        print("Aviso: no se pudo construir la base relacional:", e)
     try:
         if get_collection().count() == 0:
-            print("Chroma vacío: indexando corpus...")
+            print("Chroma vacío: indexando la documentación del plan...")
             reindexar()
     except Exception as e:  # noqa: BLE001
         print("Aviso: no se pudo verificar/indexar Chroma:", e)

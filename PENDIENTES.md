@@ -5,9 +5,22 @@ Actualizado: 2026-06-19. El trabajo está terminado de punta a punta y funcional
 ## ✅ Hecho
 
 - **Datos reales de los 6 integrantes** (estados académicos + exámenes). Eliminados los perfiles
-  sintéticos: `analisis.tabla_grupo()` usa los 6 reales. Corpus: 418 docs, 199 notas reales.
-- **Pipeline RAG completo** (pdfplumber → MiniLM → Chroma → Phi-4-mini/Ollama) con fallback a
+  sintéticos: `analisis.tabla_grupo()` usa los 6 reales. Corpus: 413 filas relacional + 136 docs
+  vectorial, 221 notas reales.
+- **Pipeline RAG completo** (pdfplumber → SQLite + Chroma → Phi-4-mini/Ollama) con fallback a
   solo-retrieval si Ollama está apagado.
+- **Persistencia híbrida (corrección de cátedra, Tomás).** Los datos tabulares (historial
+  académico + correlatividades) se movieron a una base **relacional** (SQLite, `src/db.py`); la
+  base **vectorial** (Chroma) queda solo con la documentación del plan. El retrieval ahora combina
+  ambas (`rag.py` y `generar.py`). Cada dato en la base que le corresponde.
+- **Diseño Curricular (Ord. 1877) en la vectorial.** Se ingieren las 36 fichas de materia (con
+  objetivos, competencias, contenidos mínimos y cargas horarias) + la prosa del diseño curricular.
+  El recomendador (`recomendar_orientacion`, `plan_cursada`) ahora **cita contenidos reales** de
+  las materias, no solo nombres (resuelve el "trabajo futuro" del recomendador por contenido).
+- **Matching de nombres de materias robustecido.** Alias para variantes (p. ej. "Desarrollo de
+  Aplicaciones Móviles" ≡ "Aplicaciones Móviles"), limpieza de "(Elec" truncado, y el acta de
+  notas manda (si tiene nota ahí, está aprobada). Sin duplicados ni electivas aprobadas ofrecidas
+  como disponibles.
 - **Parseo de correlatividades** arreglado (Nº35 "Seguridad en los Sistemas de Información"
   completa; Nº36 "Proyecto Final" sin arrastrar "(integradora)"). 36/36.
 - **Evaluación**: grounding léxico **+ semántico** (embeddings) + demo con/sin RAG. Números
@@ -36,11 +49,12 @@ Actualizado: 2026-06-19. El trabajo está terminado de punta a punta y funcional
    verificar que esté todo cubierto y **dar una puntuación del 1 al 10** del trabajo.
 2. **Superar las limitaciones documentadas.** Intentar implementar/mejorar los puntos de la sección
    "Limitaciones" del informe para hacer todo más robusto:
-   - descripciones reales de cátedras/electivas en el corpus (recomendador por contenido, no solo nombre);
+   - ~~descripciones de cátedras en el corpus (recomendador por contenido)~~ ✅ hecho (fichas Ord. 1877);
+     falta solo sumar descripciones de las **electivas** (no detalladas en la ordenanza);
    - grounding con verificación de consistencia lógica (detectar contradicciones, no solo cercanía);
    - acotar las imprecisiones puntuales del modelo chico (p. ej. validar notas citadas contra el contexto).
 
 ## 💡 Trabajo futuro (documentado en el informe, no bloqueante)
 
-- Incorporar descripciones reales de cátedras al corpus (recomendador por contenido, no solo nombre).
+- Sumar descripciones de las **electivas** (las obligatorias ya tienen contenidos en la vectorial).
 - Grounding con verificación de consistencia (detectar contradicciones, no solo cercanía).

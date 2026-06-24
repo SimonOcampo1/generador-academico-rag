@@ -17,17 +17,19 @@ REM 1) Encender el modelo local (Ollama). Si ya corre, no pasa nada.
 start "Ollama" /min cmd /c "ollama serve"
 timeout /t 2 >nul
 
-REM 2) Levantar la web app (la primera vez indexa el corpus en Chroma).
-if exist ".venv\Scripts\python.exe" (
-  start "WebApp" /min cmd /c ".venv\Scripts\python.exe -m uvicorn app.main:app --port 8000"
-) else (
-  start "WebApp" /min cmd /c "python -m uvicorn app.main:app --port 8000"
-)
+REM 2) Entorno Python local a esta maquina (se crea/instala solo la primera vez).
+call scripts\setup-venv.bat
+if %errorlevel% neq 0 goto :fin
 
-REM 3) Abrir el navegador
+REM 3) Levantar la web app (la primera vez construye las bases: SQLite + Chroma).
+start "WebApp" /min "%PYEXE%" -m uvicorn app.main:app --port 8000
+
+REM 4) Abrir el navegador
 timeout /t 5 >nul
 start "" http://localhost:8000
 
 echo Listo. Se abrio http://localhost:8000
 echo Para cerrar todo, cerra las ventanas "Ollama" y "WebApp".
+
+:fin
 pause

@@ -154,7 +154,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel);border:1px so
     <span class="eyebrow">El problema</span>
     <h2>Generar, no consultar</h2>
     <div class="row" style="margin-top:30px;">
-      <p class="lead grow">"¿Qué notas tengo?" lo resuelve un <strong>SQL</strong>. Eso es lookup, no IA.</p>
+      <p class="lead grow">"¿Qué notas tengo?" lo resuelve un <strong>SQL</strong> &mdash;por eso esos datos van en una base relacional&mdash;. Pero eso es lookup, no IA.</p>
       <ul class="clean grow">
         <li class="frag">El producto son <em>artefactos nuevos</em>: planes, informes, cartas.</li>
         <li class="frag">Texto sintetizado con razonamiento y estilo, no un campo de tabla.</li>
@@ -169,10 +169,10 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel);border:1px so
     <h2>Un corpus mixto y privado</h2>
     <div class="row" style="margin-top:24px;align-items:center;">
       <ul class="clean grow">
-        <li class="frag"><strong>439 documentos</strong>: estados, notas y plan 2023.</li>
-        <li class="frag">Estructurado (notas, años) + no estructurado (plan).</li>
+        <li class="frag"><strong>413 filas + 136 docs</strong>: estados, notas, plan y contenidos de materias.</li>
+        <li class="frag">Tabular → base <strong>relacional</strong>; prosa del plan → base <strong>vectorial</strong>.</li>
         <li class="frag">Join por <em>nombre normalizado</em>: los códigos no coinciden.</li>
-        <li class="frag"><strong>220 notas reales</strong> de los 6 integrantes (prom. 8.0–8.7).</li>
+        <li class="frag"><strong>221 notas reales</strong> de los 6 integrantes (prom. 8.0–8.7).</li>
       </ul>
       <div class="grow frag">
         <div class="figbox"><img src="../figs/avance_anual.png" alt="Avance anual" /></div>
@@ -186,11 +186,11 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel);border:1px so
     <span class="eyebrow">Arquitectura</span>
     <h2>El pipeline RAG, de punta a punta</h2>
     <div class="row" style="margin-top:26px;align-items:center;">
-      <p class="lead grow">Cada etapa la construimos nosotros. El pipeline corre <em>local</em>; la generación, en GPU gratuita (Colab) o local. La recuperación tiene dos modos: <em>semántico</em> y <em>determinístico por metadata</em>.</p>
+      <p class="lead grow">Cada etapa la construimos nosotros. El pipeline corre <em>local</em>; la generación, en GPU gratuita (Colab) o local. <strong>Persistencia híbrida</strong>: lo tabular en relacional (SQL exacto), la documentación en vectorial (semántico). El retrieval <em>combina</em> ambas.</p>
       <div class="pipe grow">
         <div class="step frag"><b>PDFs</b> → pdfplumber → documentos</div>
-        <div class="step frag">→ embeddings <b>MiniLM</b> → <b>Chroma</b></div>
-        <div class="step frag">→ retrieval top-k → <b>contexto</b></div>
+        <div class="step frag">→ tabular → <b>SQLite</b> · prosa → <b>MiniLM</b> → <b>Chroma</b></div>
+        <div class="step frag">→ retrieval híbrido (SQL + vector) → <b>contexto</b></div>
         <div class="step frag">→ <b>qwen2.5:14B</b> (Ollama · GPU) → artefacto</div>
       </div>
     </div>

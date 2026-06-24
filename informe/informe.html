@@ -90,15 +90,16 @@
       pipeline RAG construido de punta a punta.</p>
     <div class="meta">
       <span><b>Grupo 14</b> Martin, Gentil, Natalichio, Cuenca, Ocampo, Aubert</span>
-      <span><b>Pipeline</b> pdfplumber → MiniLM → Chroma → qwen2.5:14B (Ollama)</span>
+      <span><b>Pipeline</b> pdfplumber → SQLite + Chroma (MiniLM) → qwen2.5:14B (Ollama)</span>
       <span><b>Entorno</b> híbrido: pipeline local · generación en GPU (Colab)</span>
     </div>
   </header>
 
   <section>
     <h2><span class="n">01</span>Planificación y metodología</h2>
-    <p>El objetivo es construir un sistema de IA generativa que, alimentado por una base
-      vectorial con el historial académico del grupo más la documentación de la carrera,
+    <p>El objetivo es construir un sistema de IA generativa que, alimentado por <b>dos bases de
+      datos</b> &mdash;una <b>relacional</b> con el historial académico del grupo y las
+      correlatividades, y una <b>vectorial</b> con la documentación de la carrera&mdash;
       <b>genere artefactos académicos personalizados</b>: planes de cursada justificados,
       informes de trayectoria, cartas de pasantía, recomendaciones de orientación, diagnóstico
       grupal y simulaciones what-if.</p>
@@ -108,10 +109,11 @@
       materias <i>podés</i> cursar; este sistema redacta qué <i>conviene</i> y por qué,
       cruzando notas, correlativas y patrón de rendimiento.</p>
     <p>La metodología siguió el pipeline de Ciencia de Datos completo: ingesta y preprocesamiento
-      de un corpus mixto, vectorización, análisis exploratorio, visualización, clustering,
-      generación con control de tono y evaluación cuantitativa del anclaje (grounding).</p>
+      de un corpus mixto, <b>persistencia híbrida</b> (relacional para lo tabular, vectorial para
+      la documentación), análisis exploratorio, visualización, clustering, generación con control
+      de tono y evaluación cuantitativa del anclaje (grounding).</p>
     <div class="kpis">
-      <div class="kpi"><b>439</b><span>documentos en el corpus</span></div>
+      <div class="kpi"><b>413+136</b><span>filas (relacional) + docs (vectorial)</span></div>
       <div class="kpi"><b>36</b><span>correlatividades parseadas</span></div>
       <div class="kpi"><b>6</b><span>generadores de artefactos</span></div>
       <div class="kpi"><b>3</b><span>tonos controlables</span></div>
@@ -121,15 +123,20 @@
   <section>
     <h2><span class="n">02</span>Datos, EDA y preprocesamiento</h2>
     <p>El corpus combina lo <b>estructurado</b> (notas, años y correlatividades) con lo
-      <b>no estructurado</b> (chunks del plan de estudios). Las fuentes son PDFs reales:
-      los estados académicos y exports de exámenes de los <b>seis integrantes del grupo</b>, y el
-      Plan de Sistemas 2023 (correlatividades del Anexo I y equivalencias del Anexo II).</p>
+      <b>no estructurado</b> (chunks del plan de estudios), y <b>cada parte se persiste en la base
+      que le corresponde</b>: lo tabular en una base <b>relacional</b> (SQLite), la documentación
+      en una base <b>vectorial</b> (Chroma). Las fuentes son PDFs reales: los estados académicos y
+      exports de exámenes de los <b>seis integrantes del grupo</b>, el Plan de Sistemas 2023
+      (correlatividades del Anexo I y equivalencias del Anexo II) y el <b>Diseño Curricular completo
+      (Ord. 1877)</b>, del que se extraen las fichas de las 36 materias con sus contenidos mínimos.</p>
     <p>El preprocesamiento crítico fue el <b>join entre el estado académico y el plan</b>: los
       códigos institucionales no coinciden entre documentos, así que la clave de unión es el
       <i>nombre de materia normalizado</i> (minúsculas, sin tildes ni puntuación). Se parsearon
       las 36 obligatorias con sus correlativas, resolviendo casos borde como las integradoras,
-      cuyo nombre se parte en dos líneas. El corpus final tiene 439 documentos: 383 de estados
-      académicos, 36 de correlatividades y 20 chunks del plan.</p>
+      cuyo nombre se parte en dos líneas. El parseo produce 549 registros que se reparten entre las
+      dos bases: <b>413 filas a la relacional</b> (377 de estados académicos + 36 de
+      correlatividades) y <b>136 documentos a la vectorial</b> (100 chunks de prosa del diseño
+      curricular + 36 fichas de materia con sus contenidos mínimos, del Anexo de la Ord. 1877).</p>
     <p>El historial de notas de exámenes usa los nombres del <b>Plan 2008</b>, mientras que el
       estado académico ya migró a los del <b>Plan 2023</b>. Para que el cruce no pierda notas
       aprobadas por equivalencia, incorporamos el <b>Anexo II</b> del plan (régimen de
@@ -142,7 +149,7 @@
       (&laquo;cursando&raquo;, aún sin nota) o no iniciada&mdash; para que el plan de cursada excluya
       lo que ya se está cursando y ofrezca, además de las obligatorias habilitadas, las electivas del
       plan todavía disponibles.</p>
-    <p>El análisis exploratorio trabaja sobre <b>220 registros reales</b> de notas (una entrada por
+    <p>El análisis exploratorio trabaja sobre <b>221 registros reales</b> de notas (una entrada por
       materia aprobada con calificación numérica), correspondientes a los seis integrantes. Los
       promedios van de <b>8.0 a 8.7</b>, un grupo parejo y de buen rendimiento; las diferencias
       aparecen al desagregar por área temática, que es lo que explota el diagnóstico grupal.</p>
@@ -165,22 +172,33 @@
     <p>El pipeline se construyó en módulos independientes, cada uno con self-checks:</p>
     <pre>extract.py    PDF → texto (pdfplumber)
 documents.py  texto → documentos + correlatividades; normalizar() = clave de join
-ingest.py     corpus → Chroma; buscar() semántico + obtener() por metadata
-rag.py        chat() al LLM (qwen2.5:14B vía Ollama, local o Colab); fallback si está apagado
-analisis.py   DataFrame de notas reales (6 integrantes) + agregaciones por área
+db.py         datos tabulares → SQLite (relacional); consultas SQL (historial, correlativas)
+ingest.py     prosa del plan + fichas de materia (contenidos) → Chroma (vectorial); buscar() semántico
+rag.py        retrieval híbrido (SQL + vector) → LLM (qwen2.5:14B vía Ollama); fallback si está apagado
+analisis.py   DataFrame de notas reales (6 integrantes, desde SQLite) + agregaciones por área
 figuras.py    EDA, radar, clustering (KMeans/PCA), t-SNE de embeddings
 generar.py    6 generadores de artefactos con control de tono
 evaluar.py    grounding léxico + semántico + comparar_con_sin_rag()</pre>
+    <h3>Persistencia híbrida: cada dato en su base</h3>
+    <p>El historial académico y las correlatividades son <b>datos tabulares</b> (alumno, materia,
+      nota, año; Nº de plan y correlativas): registros que se consultan con <b>exactitud</b>
+      &mdash;filtros, joins, agregaciones&mdash;, no con similitud semántica. Por eso viven en una
+      base <b>relacional</b> (SQLite, <code>db.py</code>). La <b>documentación del plan</b> &mdash;
+      prosa larga del régimen, perfil y alcances&mdash; va en la base <b>vectorial</b> (Chroma),
+      donde el matching por embeddings hace lo que un <code>SELECT</code> no puede. Meter lo
+      tabular en la vectorial habría sido usar búsqueda aproximada para un lookup determinístico;
+      la decisión de separarlos es deliberada y mejora exactitud y claridad.</p>
     <p>La vectorización usa <b>all-MiniLM-L6-v2</b> (el embedding por defecto de Chroma, local y
-      offline). El retrieval tiene dos modos: <b>semántico</b> (similitud de embeddings, para
-      lenguaje natural) y <b>determinístico</b> (por metadata, para anclar exactamente las
-      materias aprobadas de un alumno y las correlatividades). La generación corre sobre
-      <b>qwen2.5:14B vía Ollama</b>; si Ollama está apagado, la parte RAG sigue funcionando y
-      devuelve el contexto recuperado.</p>
+      offline). El retrieval es <b>híbrido</b> y <b>combina las dos bases</b>: <b>relacional</b>
+      (consultas SQL que anclan exactamente las materias aprobadas de un alumno y las
+      correlatividades) + <b>vectorial</b> (similitud de embeddings sobre la prosa del plan). Una
+      misma consulta cruza ambas en un solo contexto. La generación corre sobre <b>qwen2.5:14B vía
+      Ollama</b>; si Ollama está apagado, la parte RAG sigue funcionando y devuelve el contexto
+      recuperado.</p>
 
     <h3>Arquitectura de ejecución híbrida</h3>
-    <p>Todo el pipeline RAG &mdash;extracción, embeddings, base vectorial y recuperación&mdash; corre
-      <b>local</b> en la máquina del grupo. Lo único que cambia de lugar es la <b>generación del
+    <p>Todo el pipeline RAG &mdash;extracción, base relacional, embeddings, base vectorial y
+      recuperación&mdash; corre <b>local</b> en la máquina del grupo. Lo único que cambia de lugar es la <b>generación del
       LLM</b>: como `rag.py` consume Ollama por HTTP (variable <code>OLLAMA_URL</code>), el modelo
       puede correr en la misma PC (CPU) o en una <b>GPU T4 gratuita de Google Colab</b>, expuesta por
       un túnel de URL fija. Esto permite usar un modelo grande (14B) con respuestas en segundos sin
@@ -263,13 +281,14 @@ evaluar.py    grounding léxico + semántico + comparar_con_sin_rag()</pre>
     <h3>Limitaciones</h3>
     <p>El grounding, aun en su versión semántica, no detecta <i>contradicciones</i> sutiles: mide
       cercanía con el contexto, no consistencia lógica con él; mide densidad de datos citados, no
-      corrección del razonamiento. El recomendador por matching se apoya en nombres de materias y
-      correlativas, no en las descripciones reales de cada cátedra. Y la generación, anclada en el
-      contexto y acotada por el retrieval determinístico por metadata, puede aun así deslizar
+      corrección del razonamiento. El recomendador ya cruza los <b>contenidos mínimos</b> de las
+      materias (no solo sus nombres), pero las <b>electivas</b> no tienen ficha individual en el
+      diseño curricular, así que sobre ellas se razona a nivel de régimen. Y la generación, anclada
+      en el contexto y acotada por el lookup exacto de la base relacional, puede aun así deslizar
       matices imprecisos que solo una verificación de consistencia detectaría.</p>
     <h3>Trabajo futuro</h3>
-    <p>Incorporar las descripciones de cátedras y electivas al corpus para que el recomendador
-      compare contenidos y no solo nombres; reforzar la evaluación con métricas de RAG más finas
+    <p>Sumar las descripciones de las electivas (no detalladas en la ordenanza) para recomendarlas
+      por contenido como ya se hace con las obligatorias; reforzar la evaluación con métricas de RAG más finas
       &mdash;<i>faithfulness</i> y <i>answer/context relevancy</i> con un LLM como juez, o precisión
       de recuperación (hit-rate / MRR) sobre el retriever&mdash; que capturen consistencia y no solo
       cercanía léxica; y consolidar la arquitectura híbrida (modelo grande en GPU para la demo, base

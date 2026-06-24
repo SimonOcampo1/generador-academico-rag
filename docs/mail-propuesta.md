@@ -2,7 +2,7 @@ Buenas,
 
 Somos el grupo 14: Martin Tomas, Gentil Mora, Natalichio Santiago, Cuenca Juan Bautista, Ocampo Simon y Aubert Lautaro.
 
-Replanteamos la propuesta para que el RAG y la base vectorial sean el núcleo. La nueva idea es un "Generador Académico RAG": a partir de una base vectorial con un historial académico (notas, materias, fechas, correlativas) y la documentación de la carrera, el sistema genera artefactos personalizados. No busca respuestas: sintetiza contenido nuevo a partir de datos privados que ningún modelo conoce. Para la demo lo cargamos con los datos del grupo, pero es escalable a cualquier alumno o cohorte.
+Replanteamos la propuesta para que el RAG sea el núcleo, con una persistencia híbrida que combina dos bases de datos. Tomando tu observación, separamos los datos según su naturaleza: el historial académico y las correlatividades —datos tabulares— van en una base relacional (SQLite), donde un lookup o un join exacto es lo correcto; la documentación de la carrera —texto largo no estructurado— va en una base vectorial (Chroma) para búsqueda semántica. El "Generador Académico RAG" combina ambas para obtener el contexto y, a partir de él, genera artefactos personalizados. No busca respuestas: sintetiza contenido nuevo a partir de datos privados que ningún modelo conoce. Para la demo lo cargamos con los datos del grupo, pero es escalable a cualquier alumno.
 
 Ejemplos de pedidos:
 
@@ -12,6 +12,6 @@ Ejemplos de pedidos:
 - "Recomendá una orientación profesional según las materias donde mejor rindo."
 - "Simulá cómo cambia mi perfil si me saco un 9 en Inteligencia Artificial."
 
-El foco es construir nosotros el pipeline RAG completo (chunking, embeddings, base vectorial y recuperación), más el análisis exploratorio y el clustering de los perfiles.
+El foco es construir nosotros el pipeline RAG completo (parseo, persistencia híbrida relacional + vectorial, embeddings y recuperación combinada), más el análisis exploratorio y el clustering de los perfiles.
 
 Desde ya, gracias.

@@ -1,8 +1,10 @@
 """Generadores de artefactos académicos sobre el pipeline RAG.
 
-Cada artefacto ancla la generación en contexto recuperado de la base vectorial (grounding):
-- determinístico por metadata (las materias aprobadas del alumno, las 36 correlatividades),
-- + semántico cuando hace falta (ingest.buscar).
+Cada artefacto ancla la generación COMBINANDO las dos bases de datos (grounding):
+- la base RELACIONAL (db.py, SQLite): los datos tabulares —historial académico del alumno y
+  las 36 correlatividades— consultados con exactitud (lookup/join determinístico),
+- la base VECTORIAL (ingest.buscar, Chroma): la documentación del plan (prosa), por similitud
+  semántica, cuando el artefacto necesita texto libre de la carrera.
 
 El LLM (rag.chat) recibe SOLO ese contexto. Si Ollama está apagado, `salida` es None y queda
 el contexto + prompt listos (la parte RAG funciona igual; la generación se completa con Ollama).
@@ -12,8 +14,9 @@ Tono controlable: mismo dato, distinto registro -> esto es lo que lo hace genera
 from __future__ import annotations
 
 import analisis
+import db
 from documents import canon
-from ingest import buscar, obtener
+from ingest import buscar
 from rag import chat
 
 TONOS = {
@@ -34,47 +37,44 @@ _SYSTEM = (
 )
 
 
-# --- Contexto (grounding) --------------------------------------------------
+# --- Contexto: base RELACIONAL (datos tabulares) ---------------------------
 def _aprobadas(alumno: str) -> list[dict]:
-    docs = obtener({"$and": [{"fuente": "estado_academico"}, {"alumno": alumno}]})
-    return [d for d in docs if d["metadata"]["nota"] >= 0]
+    return db.aprobadas(alumno)  # filas {alumno, materia, codigo, anio, nota, estado}
 
 
 def _correlativas() -> list[dict]:
-    return obtener({"fuente": "correlatividades"})
+    return db.correlativas()  # filas {num_plan, materia, cursar, rendir}
 
 
-def _ctx_aprobadas_compacto(docs: list[dict]) -> str:
+def _ctx_aprobadas_compacto(filas: list[dict]) -> str:
     """Aprobadas en una línea por materia ('Materia (nota, año N)'), no la prosa verbosa.
 
     En CPU el costo dominante es procesar el contexto; compactarlo acelera la generación sin
     perder los datos que el grounding necesita (nombre de materia + nota).
     """
-    filas = sorted(docs, key=lambda d: (d["metadata"]["anio"] or 99, d["metadata"]["materia"]))
+    filas = sorted(filas, key=lambda r: (r["anio"] or 99, r["materia"]))
 
-    def fmt(d: dict) -> str:
-        md = d["metadata"]
-        ano = f", año {md['anio']}" if md["anio"] else ""  # las del acta de notas no traen año
-        return f"- {md['materia']} (nota {md['nota']}{ano})"
+    def fmt(r: dict) -> str:
+        ano = f", año {r['anio']}" if r["anio"] else ""  # las del acta de notas no traen año
+        return f"- {r['materia']} (nota {r['nota']}{ano})"
 
-    return "\n".join(fmt(d) for d in filas)
+    return "\n".join(fmt(r) for r in filas)
 
 
-def _ctx_estado_rico(docs: list[dict]) -> str:
+def _ctx_estado_rico(filas: list[dict]) -> str:
     """Como el compacto pero con el código de materia: más strings concretos para anclar.
 
     Saca el ruido (Tomo/Folio/horas del PDF) pero conserva código + nota + año, que es lo que el
     modelo copia para mantenerse anclado en datos reales (sube el grounding sin ensuciar la prosa).
     """
-    filas = sorted(docs, key=lambda d: (d["metadata"]["anio"] or 99, d["metadata"]["materia"]))
+    filas = sorted(filas, key=lambda r: (r["anio"] or 99, r["materia"]))
 
-    def fmt(d: dict) -> str:
-        md = d["metadata"]
-        cod = f"código {md['codigo']}, " if md["codigo"] else ""
-        ano = f", año {md['anio']}" if md["anio"] else ""
-        return f"- {md['materia']} ({cod}nota {md['nota']}{ano})"
+    def fmt(r: dict) -> str:
+        cod = f"código {r['codigo']}, " if r["codigo"] else ""
+        ano = f", año {r['anio']}" if r["anio"] else ""
+        return f"- {r['materia']} ({cod}nota {r['nota']}{ano})"
 
-    return "\n".join(fmt(d) for d in filas)
+    return "\n".join(fmt(r) for r in filas)
 
 
 def _cursables(alumno: str) -> list[dict]:
@@ -85,29 +85,28 @@ def _cursables(alumno: str) -> list[dict]:
     Devuelve, por materia, qué correlativas la habilitan (para que el modelo justifique sobre datos
     reales, no sobre suposiciones). La priorización y la prosa las genera el modelo.
     """
-    aprob_canon = {canon(d["metadata"]["materia"]) for d in _aprobadas(alumno)}
+    aprob_canon = {canon(r["materia"]) for r in _aprobadas(alumno)}
     # Materias que el alumno está cursando AHORA (sin nota todavía, estado "Cursa en..."): no son
     # candidatas a "cursar el próximo cuatrimestre" -> sin esto se recomendaban materias en curso.
     en_curso_canon = {
-        canon(d["metadata"]["materia"])
-        for d in obtener({"$and": [{"fuente": "estado_academico"}, {"alumno": alumno}]})
-        if str(d["metadata"].get("estado", "")).startswith("Cursa")
+        canon(r["materia"])
+        for r in db.historia(alumno)
+        if str(r.get("estado", "")).startswith("Cursa")
     }
     excluir = aprob_canon | en_curso_canon
     corr = _correlativas()
-    num_a_nombre = {int(d["metadata"]["num_plan"]): d["metadata"]["materia"] for d in corr}
+    num_a_nombre = {int(r["num_plan"]): r["materia"] for r in corr}
     # Para CURSAR una materia hace falta tener CURSADAS sus correlativas (no aprobadas). Una materia
     # en curso estará cursada el próximo cuatrimestre -> cuenta para habilitar la siguiente.
     cursadas_nums = {n for n, nom in num_a_nombre.items() if canon(nom) in excluir}
     cursables: list[dict] = []
-    for d in corr:
-        md = d["metadata"]
-        if canon(md["materia"]) in excluir:
+    for r in corr:
+        if canon(r["materia"]) in excluir:
             continue  # ya aprobada o cursándose ahora: no es candidata a cursar
-        req = [int(x) for x in md["cursar"].split(",") if x]
+        req = [int(x) for x in r["cursar"].split(",") if x]
         if all(n in cursadas_nums for n in req):  # todas las correlativas para cursarla, cumplidas
             cursables.append({
-                "materia": md["materia"], "num": int(md["num_plan"]),
+                "materia": r["materia"], "num": int(r["num_plan"]),
                 "habilitada_por": [num_a_nombre.get(n, f"materia {n}") for n in req],
             })
     return sorted(cursables, key=lambda c: c["num"])
@@ -119,26 +118,77 @@ def _electivas_disponibles(alumno: str) -> list[str]:
     Las electivas no están en la tabla de correlatividades (solo las 36 obligatorias), así que se
     toman del propio estado académico: materias no iniciadas que no son obligatorias.
     """
-    obligatorias = {canon(d["metadata"]["materia"]) for d in _correlativas()}
+    obligatorias = {canon(r["materia"]) for r in _correlativas()}
     out: list[str] = []
-    for d in obtener({"$and": [{"fuente": "estado_academico"}, {"alumno": alumno}]}):
-        md = d["metadata"]
-        est = str(md.get("estado", ""))
-        if md["nota"] >= 0 or est.startswith("Cursa") or est.startswith("Aprobada"):
+    for r in db.historia(alumno):
+        est = str(r.get("estado", ""))
+        if r["nota"] >= 0 or est.startswith("Cursa") or est.startswith("Aprobada"):
             continue  # aprobada, en curso, o aprobada por equivalencia: no es "disponible a futuro"
-        if canon(md["materia"]) not in obligatorias:  # no es de las 36 -> electiva
-            out.append(md["materia"])
+        if canon(r["materia"]) not in obligatorias:  # no es de las 36 -> electiva
+            out.append(r["materia"])
     return sorted(set(out))
 
 
+def _doc_plan(consulta: str, k: int = 2) -> str:
+    """Documentación del plan recuperada de la base VECTORIAL (prosa: régimen, modalidad).
+
+    Es la mitad 'vectorial' del contexto híbrido: complementa los datos tabulares (relacional)
+    con texto libre de la carrera. Si Chroma está vacío, devuelve "" (degrada sin romper).
+    """
+    try:
+        hits = buscar(consulta, k=k)
+    except Exception:  # noqa: BLE001 — base vectorial no construida aún
+        return ""
+    return "\n".join(f"- {h['text']}" for h in hits)
+
+
+def _excerpt(texto: str, n: int = 300) -> str:
+    """Extracto de la sección 'Contenidos mínimos' de la ficha (los temas), no el encabezado.
+
+    El offset 60 saltea mi línea-prefijo ('...contenidos mínimos de la materia X...') para tomar
+    la sección real de contenidos más abajo en la página; si no aparece, usa el cuerpo de la ficha.
+    """
+    i = texto.find("Contenidos m", 60)
+    seg = texto[i:] if i > 0 else texto.split("\n", 1)[-1]
+    return " ".join(seg.split())[:n]
+
+
+def _contenidos_afines(consulta: str, k: int = 3) -> str:
+    """Contenidos mínimos de materias afines a la consulta (base vectorial, fichas de la ordenanza).
+
+    Da al modelo CONTENIDO real de las materias para que justifique sobre temas concretos del plan,
+    no solo sobre nombres. Degrada a "" si la base vectorial no tiene las fichas.
+    """
+    try:
+        hits = buscar(consulta, k=k, where={"fuente": "contenidos_materia"})
+    except Exception:  # noqa: BLE001
+        return ""
+    return "\n".join(f"- {h['metadata'].get('materia', '')}: {_excerpt(h['text'])}" for h in hits)
+
+
 def _contexto_plan(alumno: str) -> str:
-    """Contexto del plan: rendimiento real + obligatorias habilitadas + electivas disponibles."""
+    """Contexto HÍBRIDO: rendimiento + obligatorias habilitadas + electivas (base relacional)
+    y la documentación del régimen de cursada (base vectorial)."""
     aprob = _aprobadas(alumno)
     cursables = _cursables(alumno)
+
+    # Estado de cada materia del alumno (para anotar las correlativas que habilitan: así el modelo
+    # no inventa "(en curso)" sobre una materia que en realidad está aprobada).
+    estado_por_materia = {}
+    for r in db.historia(alumno):
+        est = str(r.get("estado", ""))
+        estado_por_materia[canon(r["materia"])] = (
+            "aprobada" if (r["nota"] >= 0 or est.startswith("Aprobada"))
+            else "en curso" if est.startswith("Cursa") else "cursada"
+        )
+
+    def _con_estado(nombres: list[str]) -> str:
+        return ", ".join(f"{n} [{estado_por_materia.get(canon(n), 'cursada')}]" for n in nombres)
+
     if cursables:
         filas = "\n".join(
             f"- {c['materia']}"
-            + (f" (habilitada por: {', '.join(c['habilitada_por'])})" if c["habilitada_por"]
+            + (f" (habilitada por: {_con_estado(c['habilitada_por'])})" if c["habilitada_por"]
                else " (sin correlativas para cursar)")
             for c in cursables
         )
@@ -152,11 +202,24 @@ def _contexto_plan(alumno: str) -> str:
             "\n\nELECTIVAS del plan aún disponibles (no iniciadas; el alumno puede elegirlas):\n"
             + "\n".join(f"- {e}" for e in electivas)
         )
+    # Mitad vectorial del contexto: prosa del plan + contenidos mínimos de las materias cursables.
+    doc = _doc_plan("régimen de cursada, modalidad y carga horaria del plan de estudios 2023")
+    bloque_doc = (
+        f"\n\nDOCUMENTACIÓN DEL PLAN (recuperada de la base vectorial):\n{doc}" if doc else ""
+    )
+    cont = _contenidos_afines(
+        " ".join(c["materia"] for c in cursables) or "materias del plan", k=3
+    ) if cursables else ""
+    bloque_cont = (
+        f"\n\nCONTENIDOS de materias que puede cursar (base vectorial, para justificar por tema):\n{cont}"
+        if cont else ""
+    )
     return (
-        f"RENDIMIENTO de {alumno} (materias aprobadas con su nota y año):\n"
+        f"RENDIMIENTO de {alumno} (materias aprobadas con su nota y año) [base relacional]:\n"
         f"{_ctx_aprobadas_compacto(aprob)}\n\n"
         f"OBLIGATORIAS QUE {alumno} YA PUEDE CURSAR el próximo cuatrimestre "
-        f"(verificado contra las correlatividades del plan):\n{filas}{bloque_elec}"
+        f"(verificado contra las correlatividades del plan) [base relacional]:\n{filas}"
+        f"{bloque_elec}{bloque_doc}{bloque_cont}"
     )
 
 
@@ -181,7 +244,8 @@ def plan_cursada(alumno: str, tono: str = "tecnico") -> dict:
         "Tarea: recomendá un orden de prioridad (no hace falta usar todas). Priorizá las OBLIGATORIAS "
         "habilitadas (destraban la carrera) y, si hay cupo, sumá 1-2 ELECTIVAS afines a sus fortalezas. "
         "Para cada materia, una justificación corta que combine: (1) afinidad con las áreas donde mejor "
-        "rinde, (2) qué destraba o qué perfil refuerza. Cerrá con una sugerencia de carga realista. "
+        "rinde, (2) qué destraba o qué perfil refuerza, y si aplica, (3) un tema concreto de sus "
+        "CONTENIDOS que la conecte con su perfil. Cerrá con una sugerencia de carga realista. "
         f"{TONOS.get(tono, '')}"
     )
     return {"artefacto": "plan_cursada", "alumno": alumno, "tono": tono, **_generar(_SYSTEM, contexto, instr)}
@@ -234,9 +298,20 @@ def recomendar_orientacion(alumno: str, tono: str = "tecnico") -> dict:
         top = sub[sub["area"] == area].sort_values("nota", ascending=False).head(3)
         ej = ", ".join(f"{t.materia} ({t.nota})" for t in top.itertuples())
         lineas.append(f"- {area}: promedio {r.prom:.1f} en {int(r.n)} materias. Mejores: {ej}")
+    # Contenidos reales (base vectorial) de las materias donde mejor rinde: para justificar la
+    # recomendación sobre TEMAS concretos del plan, no solo sobre nombres de materias.
+    top_areas = list(agg.index[:2])
+    top_mats = (sub[sub["area"].isin(top_areas)].sort_values("nota", ascending=False)
+                ["materia"].head(5).tolist())
+    cont = _contenidos_afines(" ".join(top_mats) or " ".join(top_areas), k=3)
+    bloque_cont = (
+        "\n\nCONTENIDOS de las materias donde mejor rinde (base vectorial, para fundamentar por "
+        f"tema):\n{cont}" if cont else ""
+    )
     contexto = (
         "Desempeño de " + alumno + " por área temática de la carrera (de mejor a peor promedio). "
         "Es EVIDENCIA de sus fortalezas, no la lista de respuestas:\n" + "\n".join(lineas)
+        + bloque_cont
     )
     instr = (
         f"Recomendá a {alumno} hacia qué especialización o rama profesional de la Ingeniería en "
@@ -245,7 +320,8 @@ def recomendar_orientacion(alumno: str, tono: str = "tecnico") -> dict:
         "fortalezas a especializaciones REALES del mundo laboral del software (las que vos conocés: "
         "p. ej. desarrollo, datos, infraestructura, gestión, etc. — elegí las que de verdad encajen, "
         "no las nombres todas). Recomendá 1 o 2.\n"
-        "Para cada una: nombrala, conectala con las materias/áreas concretas que la respaldan, y "
+        "Para cada una: nombrala, conectala con las materias/áreas concretas que la respaldan "
+        "—y cuando puedas, con TEMAS concretos de sus contenidos (usá el bloque CONTENIDOS)—, y "
         "describí qué tipo de trabajo o perfil implica. Interpretá los datos, no los repitas; y sé "
         "honesto: no sugieras una rama que su desempeño no sostenga. "
         f"{TONOS.get(tono, '')}"
@@ -296,6 +372,7 @@ def simulacion_whatif(alumno: str, materias_nota: dict[str, int], tono: str = "t
 
 if __name__ == "__main__":
     from rag import ollama_disponible
+    db.asegurar()  # base relacional lista (la vectorial es opcional acá: _doc_plan degrada a "")
     print("Ollama:", "UP" if ollama_disponible() else "DOWN (modo fallback: contexto sin generación)")
 
     r = plan_cursada("Simón Ocampo")

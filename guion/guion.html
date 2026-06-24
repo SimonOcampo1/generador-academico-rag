@@ -106,24 +106,29 @@
     <div class="cue">Slide 3 · Datos y exploración</div>
     <div class="speech">
       <p>Gracias, Tomás. El corazón del proyecto son los datos, y son <strong>privados</strong>:
-        el modelo no los conoce. Armamos un corpus de <strong>439 documentos</strong> a partir de
-        PDFs reales: los estados académicos y exports de notas de <strong>los seis integrantes</strong>
-        del grupo, más el Plan de Sistemas 2023 con todas las correlatividades.</p>
-      <p>Lo interesante es que el corpus es <em>mixto</em>: combinamos lo <strong>estructurado</strong>
-        (cada materia con su nota y su año) con lo <strong>no estructurado</strong> (el texto del
-        plan). El desafío técnico más grande fue el <em>join</em>: los códigos de materia no
-        coinciden entre el estado y el plan, así que unimos por el <strong>nombre normalizado</strong>,
-        sin tildes ni mayúsculas. Parseamos las 36 obligatorias con sus correlativas.</p>
-      <p>Sobre eso hicimos el EDA: son <strong>220 notas reales</strong> de los seis, con promedios
+        el modelo no los conoce. Parseamos PDFs reales &mdash;los estados académicos y exports de
+        notas de <strong>los seis integrantes</strong> del grupo, más el Plan de Sistemas 2023 con
+        todas las correlatividades, más el Diseño Curricular completo&mdash; y obtenemos
+        <strong>413 filas + 136 documentos</strong>.</p>
+      <p>Lo interesante es que el corpus es <em>mixto</em>, y por eso usamos <strong>dos bases de
+        datos</strong>: lo <strong>tabular</strong> (cada materia con su nota y su año, y las
+        correlatividades) va en una base <strong>relacional</strong> &mdash;ahí un lookup o un join
+        exacto es lo correcto&mdash;; lo <strong>no estructurado</strong> (el texto del plan) va en
+        una base <strong>vectorial</strong>, para búsqueda semántica. El desafío técnico más grande
+        fue el <em>join</em>: los códigos de materia no coinciden entre el estado y el plan, así que
+        unimos por el <strong>nombre normalizado</strong>, sin tildes ni mayúsculas. Parseamos las
+        36 obligatorias con sus correlativas.</p>
+      <p>Sobre eso hicimos el EDA: son <strong>221 notas reales</strong> de los seis, con promedios
         parejos entre <strong>8.0 y 8.7</strong>. Las diferencias verdaderas aparecen al
         desagregar por área temática, y eso es justo lo que después explota el diagnóstico grupal.</p>
     </div>
     <div class="claves">
       <div class="h">Claves para estudiar / si te preguntan</div>
       <ul>
-        <li><b>Corpus:</b> 439 docs (383 de estados, 36 correlativas, 20 chunks del plan).</li>
+        <li><b>Corpus:</b> 413 filas a la relacional (377 de estados + 36 correlativas) + 136 docs a la vectorial (100 chunks de prosa del diseño + 36 fichas de materia con contenidos).</li>
+        <li><b>Por qué dos bases:</b> los datos de alumno e historial son tabulares → relacional (lookup/join exacto); la documentación del plan es texto largo → vectorial (semántico). El agente combina ambas.</li>
         <li><b>Por qué normalizar:</b> los códigos institucionales no coinciden entre documentos; el nombre normalizado es la clave de join.</li>
-        <li><b>EDA:</b> 220 notas reales de los 6 integrantes, promedios 8.0–8.7; se compara por área temática.</li>
+        <li><b>EDA:</b> 221 notas reales de los 6 integrantes, promedios 8.0–8.7; se compara por área temática.</li>
         <li><b>Equivalencias 2008↔2023:</b> el export de notas usa nombres del Plan 2008; los canonizamos al 2023 (Anexo II) para no perder notas por equivalencia.</li>
         <li><b>Export de notas más completo:</b> trae materias aprobadas que no figuran en el estado académico; se suman como aprobadas con su nota (si no, el plan las recomendaría como pendientes).</li>
       </ul>
@@ -141,17 +146,20 @@
       <p>Gracias, Mora. Acá está el núcleo del trabajo. RAG significa <em>Retrieval-Augmented
         Generation</em>: en vez de pedirle al modelo que sepa todo, le <strong>recuperamos</strong>
         el contexto justo y se lo damos para que genere sobre eso.</p>
-      <p>El flujo: los PDFs pasan por <strong>pdfplumber</strong> a texto, los convertimos en
-        documentos, los vectorizamos con <strong>MiniLM</strong> (embeddings) y los guardamos en
-        <strong>Chroma</strong>, la base vectorial. Cuando llega un pedido, recuperamos los
-        documentos más relevantes y se los pasamos a <strong>qwen2.5 (14B)</strong> vía Ollama.
-        Todo el pipeline corre local; la generación la podemos correr en una <strong>GPU gratuita
-        de Colab</strong> para usar un modelo grande en segundos, o 100% local. Los datos nunca
-        pasan por un proveedor externo: la privacidad se mantiene.</p>
-      <p>Un detalle que nos importó: tenemos <strong>dos modos de recuperación</strong>. El
-        <em>semántico</em>, por similitud de embeddings, para lenguaje natural; y el
-        <em>determinístico</em>, por metadata, para anclar exactamente las materias aprobadas de
-        un alumno. Ese segundo modo es el que garantiza que no se inventen notas.</p>
+      <p>El flujo: los PDFs pasan por <strong>pdfplumber</strong> a texto y los partimos en dos.
+        Los datos <strong>tabulares</strong> &mdash;historial y correlatividades&mdash; van a una
+        base <strong>relacional (SQLite)</strong>. La <strong>prosa del plan</strong> la
+        vectorizamos con <strong>MiniLM</strong> y la guardamos en <strong>Chroma</strong>, la base
+        vectorial. Cuando llega un pedido, recuperamos de <em>ambas</em> y se lo pasamos a
+        <strong>qwen2.5 (14B)</strong> vía Ollama. Todo el pipeline corre local; la generación la
+        podemos correr en una <strong>GPU gratuita de Colab</strong> para usar un modelo grande en
+        segundos, o 100% local. Los datos nunca pasan por un proveedor externo: la privacidad se
+        mantiene.</p>
+      <p>Un detalle que nos importó: el retrieval es <strong>híbrido</strong> y combina las dos
+        bases. La <em>relacional</em>, con SQL, ancla exactamente las materias aprobadas de un
+        alumno y sus correlativas &mdash;eso garantiza que no se inventen notas&mdash;. La
+        <em>vectorial</em>, por similitud de embeddings, trae la documentación del plan para
+        lenguaje natural. Una misma consulta cruza las dos en un solo contexto.</p>
 
       <div class="cue">Slide 5 · El espacio semántico</div>
       <p>¿Y cómo sabemos que los embeddings funcionan? Proyectamos las 36 materias con
@@ -164,8 +172,8 @@
       <div class="h">Claves para estudiar / si te preguntan</div>
       <ul>
         <li><b>RAG:</b> recuperar contexto relevante y dárselo al modelo para que genere anclado, en vez de confiar en su memoria.</li>
-        <li><b>Embeddings:</b> all-MiniLM-L6-v2, local; Chroma como vector DB persistente.</li>
-        <li><b>Retrieval semántico vs. determinístico:</b> uno por similitud (lenguaje natural), otro por metadata (grounding exacto).</li>
+        <li><b>Persistencia híbrida:</b> SQLite (relacional) para lo tabular; Chroma (vectorial, all-MiniLM-L6-v2 local) para la documentación del plan.</li>
+        <li><b>Retrieval híbrido:</b> SQL exacto sobre la relacional (grounding de notas/correlativas) + similitud sobre la vectorial (texto del plan); se combinan.</li>
         <li><b>t-SNE:</b> valida que materias de la misma área quedan cercanas en el espacio.</li>
       </ul>
     </div>
@@ -212,9 +220,9 @@
       <p>Gracias, Juan. Esta es nuestra demo estrella, y la voy a correr en vivo en la web app.
         El mismo pedido, un plan de cursada, con un botón: <strong>con RAG</strong> y
         <strong>sin RAG</strong>.</p>
-      <p>Con RAG, miren la consola: a la izquierda aparece el contexto que recuperó de la base
-        vectorial, las materias y notas reales, y a la derecha el modelo genera el plan citando
-        esos datos. Sin RAG, le sacamos el contexto: el modelo no tiene de dónde agarrarse, así
+      <p>Con RAG, miren la consola: a la izquierda aparece el contexto recuperado &mdash;las
+        materias y notas reales que vienen de la base relacional, más la documentación del plan de
+        la vectorial&mdash;, y a la derecha el modelo genera el plan citando esos datos. Sin RAG, le sacamos el contexto: el modelo no tiene de dónde agarrarse, así
         que se generaliza o directamente inventa materias que no existen.</p>
 
       <div class="cue">Slide 8 · Cómo lo medimos</div>

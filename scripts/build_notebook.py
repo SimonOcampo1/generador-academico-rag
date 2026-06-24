@@ -16,11 +16,22 @@ md(r"""
 # Generador Académico RAG — Notebook integrador
 **TP Integrador de Ciencia de Datos · UTN FRLP 2026 · Grupo 14**
 
-Sistema de IA generativa que, alimentado por una base vectorial con el **historial académico
-real** del grupo + el **plan de estudios** de la carrera, genera *artefactos académicos
-personalizados* (planes de cursada, informes, cartas de pasantía, recomendaciones,
-diagnóstico grupal, simulaciones). No responde preguntas: **sintetiza documentos nuevos**
-anclados en datos privados que el modelo no conoce.
+Sistema de IA generativa que, alimentado por **dos bases de datos** —una **relacional** con el
+**historial académico real** del grupo + las **correlatividades** del plan, y una **vectorial**
+con la **documentación** de la carrera— genera *artefactos académicos personalizados* (planes de
+cursada, informes, cartas de pasantía, recomendaciones, diagnóstico grupal, simulaciones). No
+responde preguntas: **sintetiza documentos nuevos** anclados en datos privados que el modelo no
+conoce.
+
+### Persistencia híbrida: cada dato en la base que le corresponde
+- **Base relacional (SQLite):** los datos **tabulares** —alumno, materia, nota, año, estado y las
+  36 correlatividades (Anexo I)—. Son registros estructurados: se consultan con exactitud
+  (filtros, joins, agregaciones), no con similitud semántica.
+- **Base vectorial (Chroma):** la **documentación** del plan (prosa: régimen, perfil, alcances).
+  Texto largo no estructurado, donde el matching semántico le gana a un `SELECT`.
+
+El agente **combina ambas** para armar su contexto. (Antes todo iba a la vectorial; meter datos
+tabulares ahí era usar embeddings para lo que es un lookup determinístico.)
 
 ### Por qué es generativo y no un SQL
 Un SQL te dice *qué* materias podés cursar (lookup). Esto te dice *qué conviene y por qué*,
@@ -29,9 +40,11 @@ texto nuevo sintetizado, no un campo de una tabla.
 
 ### Pipeline (lo construimos nosotros, no es NotebookLM)
 ```
-PDFs ──pdfplumber──▶ documentos (estructurado + no estructurado)
-     ──MiniLM──▶ embeddings ──▶ Chroma (base vectorial)
-     ──retrieval top-k──▶ contexto ──▶ qwen2.5:14B (Ollama) ──▶ artefacto
+                       ┌─ datos tabulares ─▶ SQLite  (base relacional) ─┐
+PDFs ─pdfplumber─▶ docs ┤                                               ├─▶ contexto
+                       └─ prosa del plan ──▶ MiniLM ─▶ Chroma (vector) ─┘   combinado
+                                                                            │
+                                          qwen2.5:14B (Ollama) ◀────────────┘ ─▶ artefacto
 ```
 El pipeline RAG corre **local**; la **generación** corre en una GPU (en Colab, la T4 gratuita).
 Si el LLM está apagado, la parte RAG funciona igual (recupera el contexto) y la generación se
@@ -74,7 +87,7 @@ if EN_COLAB:
         print("No se pudo levantar Ollama en Colab (¿sin GPU?); sigo en modo solo-retrieval:", e)
 
 sys.path.insert(0, str(Path.cwd() / "src"))  # importar los módulos del proyecto
-import analisis, documents, extract, figuras, generar, ingest, rag, evaluar
+import analisis, db, documents, extract, figuras, generar, ingest, rag, evaluar
 from IPython.display import Image, display
 
 print("Modelo:", rag.OLLAMA_MODEL, "|", "ENCENDIDO" if rag.ollama_disponible() else "apagado (solo-retrieval)")
@@ -95,8 +108,13 @@ print("\n".join(texto.splitlines()[:8]))
 
 md(r"""
 ## 2 · Construcción del corpus
-`documents.construir_corpus` fusiona lo **estructurado** (una entrada por materia con nota,
-año, alumno) con lo **no estructurado** (chunks del plan) y parsea las **36 correlatividades**.
+`documents.construir_corpus` parsea los PDFs en fuentes que van a **bases distintas según
+su naturaleza**:
+- `estado_academico` (tabular) → base **relacional**: una fila por (alumno, materia) con nota, año.
+- `correlatividades` (tabular) → base **relacional**: las 36 obligatorias con sus correlativas.
+- `plan_estudios` (prosa) → base **vectorial**: chunks del diseño curricular (Ord. 1877).
+- `contenidos_materia` (prosa) → base **vectorial**: una ficha por materia con sus contenidos mínimos.
+
 La clave de join entre estado y plan es el *nombre normalizado* (`normalizar`), porque los
 códigos institucionales no coinciden entre documentos.
 """)
@@ -104,47 +122,65 @@ code(r"""
 corpus = documents.construir_corpus()
 print(f"Total documentos en el corpus: {len(corpus)}")
 from collections import Counter
-print("Por fuente:", dict(Counter(d["metadata"]["fuente"] for d in corpus)))
+print("Por fuente (→ destino):", dict(Counter(d["metadata"]["fuente"] for d in corpus)))
+print("  estado_academico, correlatividades → SQLite (relacional) · plan_estudios, contenidos_materia → Chroma (vectorial)")
 
-print("\nEjemplo (estado académico):")
+print("\nEjemplo (estado académico, tabular → relacional):")
 ej = next(d for d in corpus if d["metadata"]["fuente"] == "estado_academico" and d["metadata"]["nota"] >= 0)
 print(" texto:", ej["text"])
 print(" metadata:", ej["metadata"])
 """)
 
 md(r"""
-## 3 · Embeddings + base vectorial Chroma
-`ingest.reindexar` vectoriza el corpus con **all-MiniLM-L6-v2** (el embedding por defecto de
-Chroma, local y offline) y lo persiste. Esta es la base que el modelo consultará.
+## 3 · Persistencia: base relacional (SQLite) + base vectorial (Chroma)
+Cada dato en la base que le corresponde:
+- `db.reindexar` carga los **datos tabulares** (historial + correlatividades) en **SQLite**. Son
+  registros estructurados: lookup y join determinístico, no semántica.
+- `ingest.reindexar` vectoriza la **documentación de la carrera** (prosa del diseño curricular +
+  fichas de materia con sus contenidos mínimos) con **all-MiniLM-L6-v2** (embedding por defecto de
+  Chroma, local y offline) y la persiste para el matching semántico.
 """)
 code(r"""
+rel = db.reindexar()
+print(f"Base RELACIONAL (SQLite) → {db.DB_PATH}")
+print(f"  historia: {rel['historia']} filas · correlatividades: {rel['correlatividades']} filas")
+
 n = ingest.reindexar()
-print(f"Indexados {n} documentos en Chroma → {ingest.CHROMA_DIR}")
+print(f"\nBase VECTORIAL (Chroma) → {ingest.CHROMA_DIR}")
+print(f"  {n} documentos de la carrera (prosa del diseño + fichas de materia)")
 """)
 
 md(r"""
-## 4 · Retrieval
-Dos modos de recuperación:
-- **Semántico** (`ingest.buscar`): similitud de embeddings, para preguntas en lenguaje natural.
-- **Determinístico** (`ingest.obtener`): por metadata, para grounding exacto (las materias
-  aprobadas de un alumno, las correlatividades). Es lo que ancla a los generadores.
+## 4 · Retrieval híbrido: combinar las dos bases
+- **Relacional** (`db`, SQL): grounding exacto sobre datos tabulares (las aprobadas de un alumno,
+  las correlativas de una materia). Es lo que ancla a los generadores.
+- **Vectorial** (`ingest.buscar`): similitud de embeddings sobre la documentación de la carrera
+  (diseño curricular + contenidos de cada materia), para texto libre.
+- `rag.generar` los **combina**: una misma consulta trae datos del alumno (SQL) + documentación
+  de la carrera (vector) en un solo contexto.
 """)
 code(r"""
-print("### Búsqueda semántica: '¿qué necesito para cursar Ciencia de Datos?'")
-for r in ingest.buscar("¿qué necesito para cursar Ciencia de Datos?", k=3):
-    print(f"  [{r['distancia']:.3f}] ({r['metadata']['fuente']}) {r['text'][:90]}")
+print("### Relacional (SQL): materias aprobadas de un alumno")
+aprobadas = db.aprobadas("Simón Ocampo")
+print(f"  {len(aprobadas)} materias con nota. Ejemplos:", [r["materia"] for r in aprobadas[:5]])
+print("  Correlativas de Ciencia de Datos:",
+      next(c for c in db.correlativas() if c["materia"].startswith("Ciencia de Datos")))
 
-print("\n### Grounding determinístico: materias aprobadas de un alumno (por metadata)")
-aprobadas = ingest.obtener({"$and": [{"fuente": "estado_academico"}, {"alumno": "Simón Ocampo"}]})
-aprobadas = [d for d in aprobadas if d["metadata"]["nota"] >= 0]
-print(f"  {len(aprobadas)} materias con nota. Ejemplos:", [d["metadata"]["materia"] for d in aprobadas[:5]])
+print("\n### Vectorial (embeddings): contenidos de materias por similitud semántica")
+for r in ingest.buscar("machine learning y modelos de datos", k=2):
+    print(f"  [{r['distancia']:.3f}] ({r['metadata']['fuente']}) {r['metadata'].get('materia','')}: {r['text'][:70]}")
+
+print("\n### Híbrido (rag.generar combina ambas en el contexto)")
+ctx = rag.generar("¿Qué necesito para cursar Ciencia de Datos y cómo le fue a Simón?")["contexto"]
+print(ctx[:400], "...")
 """)
 
 md(r"""
 ## 5 · EDA + visualización
-`analisis` arma un DataFrame de notas **reales de los 6 integrantes del grupo**, fusionando el
-estado académico de cada uno con su export de exámenes. Cada registro es `(alumno, materia, año,
-nota, área)`; las áreas temáticas mapean las 36 obligatorias del plan en 6 grupos.
+`analisis` arma un DataFrame de notas **reales de los 6 integrantes del grupo** consultando la
+**base relacional** (los datos tabulares se analizan donde corresponde, con SQL, no en la
+vectorial). Cada registro es `(alumno, materia, año, nota, área)`; las áreas temáticas mapean las
+36 obligatorias del plan en 6 grupos.
 """)
 code(r"""
 real = analisis.tabla_real()
@@ -234,8 +270,10 @@ else:
 
 md(r"""
 ## 9 · Conclusiones
-- Construimos el **pipeline RAG completo** (extracción, corpus mixto, embeddings, Chroma,
-  retrieval, generación) en vez de usar una caja negra.
+- Construimos el **pipeline RAG completo** (extracción, corpus mixto, **persistencia híbrida**
+  relacional + vectorial, retrieval combinado, generación) en vez de usar una caja negra.
+- **Cada dato en su base:** lo tabular (historial, correlatividades) en SQLite; la documentación
+  del plan en Chroma. El agente combina ambas para su contexto.
 - El sistema **genera** artefactos personalizados con tono, no responde preguntas: cada salida
   es contenido nuevo anclado en datos privados.
 - La **demo con/sin RAG** y las **cuatro métricas** (léxico, semántico, precisión factual y

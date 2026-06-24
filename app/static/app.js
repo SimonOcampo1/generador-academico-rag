@@ -22,11 +22,32 @@ function mdToHtml(src) {
     if (/^\s*$/.test(line)) { closeList(); continue; }
     if ((m = line.match(/^(#{1,6})\s+(.*)$/))) { closeList(); const n = m[1].length; html += `<h${n}>${inlineMd(m[2])}</h${n}>`; continue; }
     if ((m = line.match(/^\s*[-*]\s+(.*)$/))) { if (list !== "ul") { closeList(); list = "ul"; html += "<ul>"; } html += `<li>${inlineMd(m[1])}</li>`; continue; }
-    if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) { if (list !== "ol") { closeList(); list = "ol"; html += "<ol>"; } html += `<li>${inlineMd(m[1])}</li>`; continue; }
+    // value="N": el modelo numera bien pero los sub-bullets/líneas en blanco entre ítems cortan el
+    // <ol> (cada ítem queda en su propia lista). Sin value, todas reiniciarían en 1. Con value, el
+    // número mostrado respeta el del texto.
+    if ((m = line.match(/^\s*(\d+)[.)]\s+(.*)$/))) { if (list !== "ol") { closeList(); list = "ol"; html += "<ol>"; } html += `<li value="${m[1]}">${inlineMd(m[2])}</li>`; continue; }
     closeList(); html += `<p>${inlineMd(line)}</p>`;
   }
   closeList();
   return html;
+}
+
+/* ---- render del artefacto: markdown + fórmulas LaTeX (KaTeX) ---- */
+const MATH_DELIMS = [
+  { left: "$$", right: "$$", display: true },
+  { left: "\\[", right: "\\]", display: true },
+  { left: "\\(", right: "\\)", display: false },
+  { left: "$", right: "$", display: false },
+];
+function renderArtifact(raw) {
+  const el = $("#gen");
+  el.innerHTML = mdToHtml(raw);
+  // KaTeX (si cargó por CDN): renderiza las fórmulas también durante el streaming. Las fórmulas
+  // a medio escribir quedan como texto hasta cerrarse (throwOnError:false) y se rinden al completarse.
+  if (window.renderMathInElement) {
+    try { renderMathInElement(el, { delimiters: MATH_DELIMS, throwOnError: false }); }
+    catch (_) { /* LaTeX incompleto mid-stream: se renderiza al completarse */ }
+  }
 }
 
 /* ---- tema ---- */
@@ -225,10 +246,10 @@ function handle(ev) {
   } else if (ev.type === "token") {
     state.genRaw += ev.text;
     // ponytail: re-render del buffer completo por token; los artefactos son cortos, sobra
-    $("#gen").innerHTML = mdToHtml(state.genRaw);
+    renderArtifact(state.genRaw);
     $("#viewArtifact").scrollTop = $("#viewArtifact").scrollHeight;
   } else if (ev.type === "done") {
-    $("#gen").innerHTML = mdToHtml(state.genRaw);  // render final (cierra markdown incompleto)
+    renderArtifact(state.genRaw);  // render final (cierra markdown/LaTeX incompleto)
     if (ev.grounding != null) showGround(ev.grounding);
     $("#stats").textContent = (ev.stats && ev.stats.tokens)
       ? `${ev.stats.tokens} tokens · ${ev.stats.tok_s} tok/s · ${ev.stats.segundos}s · ${ev.fuente}`

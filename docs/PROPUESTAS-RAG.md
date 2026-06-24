@@ -19,10 +19,11 @@
 ## Lo que se agrega (el núcleo nuevo, igual para las 4)
 
 ```
-documentos → chunking → embeddings (MiniLM) → Chroma (vector DB) → retrieval top-k → Phi-4-mini → respuesta citada
+documentos ┬→ tabular → SQLite (relacional) ───────────────┬→ retrieval híbrido → Phi-4-mini → respuesta citada
+           └→ prosa → chunking → MiniLM → Chroma (vector DB)┘
 ```
 
-- **Chroma** como base vectorial (liviana, local, `pip install`).
+- **Persistencia híbrida**: SQLite (relacional) para los datos tabulares (historial, correlatividades) y **Chroma** como base vectorial para la documentación (ambas livianas, locales, `pip install` / stdlib).
 - **Demo estrella**: botón "con RAG / sin RAG". Sin RAG el modelo alucina o dice "no tengo esa info"; con RAG responde **correcto y citando la fuente**. Eso prueba ante el profe, en vivo, que el dataset es indispensable.
 - Pega con la teoría: **Chunking**, **Embeddings y Bases Vectoriales** (etapa 5), **Prompt Engineering**, **IA Agéntica**.
 

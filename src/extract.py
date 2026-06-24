@@ -19,6 +19,12 @@ def pdf_to_text(path: str | Path) -> str:
         return "\n".join(page.extract_text() or "" for page in pdf.pages)
 
 
+def pdf_pages(path: str | Path) -> list[str]:
+    """Texto de cada página por separado (para documentos con 1 ítem por página)."""
+    with pdfplumber.open(path) as pdf:
+        return [page.extract_text() or "" for page in pdf.pages]
+
+
 if __name__ == "__main__":
     for p in sorted(RAW_DIR.glob("*.pdf")):
         txt = pdf_to_text(p)

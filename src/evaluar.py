@@ -78,10 +78,12 @@ def _pares_materia_nota(salida: str) -> list[tuple[str, int]]:
 
 
 def registro_alumno(alumno: str) -> dict[str, int]:
-    """{canon(materia): nota} de las materias aprobadas del alumno (la verdad de referencia)."""
-    from documents import canon
-    from generar import _aprobadas
-    return {canon(d["metadata"]["materia"]): d["metadata"]["nota"] for d in _aprobadas(alumno)}
+    """{canon(materia): nota} de las materias aprobadas del alumno (la verdad de referencia).
+
+    Sale de la base relacional: la verdad factual son datos tabulares, no recuperación semántica.
+    """
+    import db
+    return db.registro(alumno)
 
 
 def _match_claim(mat_canon: str, claves: list[str]) -> str | None:

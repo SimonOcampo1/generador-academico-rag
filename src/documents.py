@@ -23,11 +23,14 @@ def normalizar(nombre: str) -> str:
     """Clave de join entre estado (códigos institucionales) y plan (Nº 1-36).
 
     Los dos PDFs usan códigos distintos, así que el único nexo confiable es el
-    nombre de la materia. Bajamos a minúsculas, sacamos acentos, '(elec.)' y
+    nombre de la materia. Bajamos a minúsculas, sacamos acentos, el marcador
+    '(elec.)'/'(integradora)' —incluso truncado por el PDF, p. ej. '(Elec'— y
     espacios redundantes.
     """
     s = unicodedata.normalize("NFKD", nombre).encode("ascii", "ignore").decode()
-    s = s.lower().replace("(elec.)", " ").replace("(integradora)", " ")
+    s = s.lower()
+    # El PDF a veces corta el marcador: '(Elec.)', '(Elec', '(integradora'. Sacar desde el '('.
+    s = re.sub(r"\(\s*(elec|integradora)[^)]*\)?", " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
 
@@ -54,21 +57,37 @@ EQUIV_2008_2023 = {
 }
 
 
+# Variantes del MISMO nombre de materia entre el estado académico y el acta de notas (no son
+# equivalencias de plan, sino el mismo electivo nombrado distinto). El estado usa una etiqueta
+# corta y el acta el nombre completo. Un match difuso automático NO sirve: uniría electivas
+# distintas que comparten palabras (p. ej. 'Seguridad en Redes' vs 'Gestión Operativa y Seguridad
+# en Redes'), así que listamos los casos confirmados, como con EQUIV_2008_2023.
+# ponytail: tabla explícita; si aparece otra electiva nombrada distinto, sumar la línea acá.
+ALIAS_MATERIAS = {
+    "desarrollo de aplicaciones moviles": "aplicaciones moviles",  # acta -> etiqueta del estado
+}
+
+
 def canon(nombre: str) -> str:
-    """Nombre normalizado y llevado a su forma canónica del Plan 2023 (vía Anexo II)."""
-    return EQUIV_2008_2023.get(normalizar(nombre), normalizar(nombre))
+    """Nombre normalizado y llevado a su forma canónica (equivalencias 2008↔2023 + alias)."""
+    n = normalizar(nombre)
+    n = EQUIV_2008_2023.get(n, n)
+    return ALIAS_MATERIAS.get(n, n)
 
 
 def _buscar_nota(nombre: str, notas: dict[str, int]) -> int | None:
-    """Busca la nota de una materia tolerando equivalencias y la truncación de nombres del PDF."""
+    """Busca la nota de una materia tolerando equivalencias y la truncación de nombres del PDF.
+
+    El match tolerante usa _match_prefijo (gap<=4): cubre la truncación del PDF ('...informacio'
+    vs '...informacion') SIN confundir materias que solo comparten prefijo, p. ej. 'Administración
+    de Sistemas de Información' con 'Administración de Bases de Datos'. El viejo prefijo de 18
+    chars ('administracion de ') las colisionaba y devolvía la nota equivocada.
+    """
     c = canon(nombre)
     if c in notas:
         return notas[c]
-    # los nombres largos vienen cortados a ~40 chars en el PDF: matcheo por prefijo común
-    for k, v in notas.items():
-        if len(c) >= 18 and (k.startswith(c[:18]) or c.startswith(k[:18])):
-            return v
-    return None
+    k = _match_prefijo(c, list(notas))
+    return notas[k] if k else None
 
 
 def _match_prefijo(clave: str, candidatos) -> str | None:
@@ -139,8 +158,10 @@ def documentos_estado(texto: str, alumno: str, notas_examenes: dict[str, int] | 
         nota = int(nota_m.group(1)) if nota_m else None
         if nota is None and notas_examenes:  # recuperar nota desde Notas-*.pdf (vía equivalencias)
             nota = _buscar_nota(nombre, notas_examenes)
-            if nota is not None and "con" not in estado:
-                estado = f"{estado} (nota {nota})"
+            if nota is not None:
+                # El acta de exámenes manda: si la materia tiene nota ahí, está APROBADA, aunque el
+                # estado diga 'en curso' o 'sin información de cursada' (suele ser un snapshot viejo).
+                estado = f"Aprobada con {nota} (registrada en el acta de exámenes)"
 
         texto_doc = (
             f"{alumno}, en la carrera Ingeniería en Sistemas de Información (Plan 2023), "
@@ -223,6 +244,52 @@ def documentos_plan(texto: str) -> list[dict]:
         }
         for n, c in enumerate(chunk_text(_limpiar_plan(texto)))
     ]
+
+
+# Diseño curricular completo (Ord. 1877): una materia por página (págs ~39-74, con "Nº de orden:
+# N"), con objetivos, competencias y contenidos mínimos; el resto es prosa del diseño (perfil,
+# alcances, fundamentación). Todo es texto no estructurado -> base vectorial.
+ORDENANZA = "SistemasOrdenanza1877.pdf"
+_ORDEN = re.compile(r"orden:\s*(\d+)", re.IGNORECASE)
+
+
+def documentos_ordenanza(plan_corr: dict[int, dict]) -> list[dict]:
+    """Ordenanza 1877 -> documentos para la base vectorial.
+
+    - Página con 'Nº de orden: N' (N en 1..36): un documento por materia con sus contenidos
+      mínimos (fuente 'contenidos_materia'). El nombre limpio sale del plan (el Nº de orden
+      coincide con el Nº de plan), no del texto desprolijo de la página.
+    - Resto de páginas: prosa del diseño curricular -> chunks (fuente 'plan_estudios').
+    """
+    from extract import pdf_pages
+    path = RAW_DIR / ORDENANZA
+    if not path.exists():
+        return []
+    nombre_de = {n: d["nombre"] for n, d in plan_corr.items()}
+    docs: list[dict] = []
+    prosa: list[str] = []
+    for pag in pdf_pages(path):
+        limpio = _limpiar_plan(pag)
+        if not limpio:
+            continue
+        m = _ORDEN.search(pag)
+        if m and int(m.group(1)) in nombre_de:
+            n = int(m.group(1))
+            nombre = nombre_de[n]
+            docs.append({
+                "id": f"contenidos-{n:02d}",
+                "text": (f"Descripción y contenidos mínimos de la materia '{nombre}' "
+                         f"(asignatura Nº {n} del Plan 2023 de Ingeniería en Sistemas de "
+                         f"Información):\n{limpio}"),
+                "metadata": {"fuente": "contenidos_materia", "materia": nombre, "num_plan": n},
+            })
+        else:
+            prosa.append(limpio)
+    docs += [
+        {"id": f"diseno-{i:03d}", "text": c, "metadata": {"fuente": "plan_estudios", "chunk": i}}
+        for i, c in enumerate(chunk_text("\n".join(prosa)))
+    ]
+    return docs
 
 
 # --- Correlatividades (Anexo I del plan) -----------------------------------
@@ -347,8 +414,14 @@ def construir_corpus() -> list[dict]:
         notas = notas_de_examenes(pdf_to_text(notas_pdf)) if notas_pdf.exists() else None
         docs += documentos_estado(texto, alumno=alumno, notas_examenes=notas, nombres_plan=nombres_plan)
     if texto_plan:
+        docs += documentos_correlatividades(plan_corr)  # -> base relacional
+    # Prosa de la carrera (-> base vectorial): el diseño curricular completo (Ord. 1877) con los
+    # contenidos mínimos por materia. Si no está ese PDF, se usa la prosa del Plan-Sistemas-2023.
+    ord_docs = documentos_ordenanza(plan_corr)
+    if ord_docs:
+        docs += ord_docs
+    elif texto_plan:
         docs += documentos_plan(texto_plan)
-        docs += documentos_correlatividades(plan_corr)
     return docs
 
 

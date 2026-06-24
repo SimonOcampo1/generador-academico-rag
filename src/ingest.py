@@ -1,4 +1,10 @@
-"""Documentos -> base vectorial Chroma (persistente en data/chroma).
+"""Documentación de la carrera -> base vectorial Chroma (persistente en data/chroma).
+
+La base vectorial guarda SÓLO texto no estructurado: la prosa del plan de estudios (régimen,
+descripciones, párrafos largos). Es donde el matching semántico le gana a un SELECT. Los datos
+TABULARES (historial académico y correlatividades) viven en la base relacional (ver db.py); el
+agente combina ambas. Antes acá entraba todo el corpus —incluidos los datos tabulares—, lo que
+era usar la base vectorial para algo que es un lookup determinístico.
 
 Chroma trae por defecto el embedding all-MiniLM-L6-v2 (el mismo MiniLM que usábamos antes),
 así que no hace falta gestionar sentence-transformers aparte: corre local y offline.
@@ -21,14 +27,20 @@ def get_collection():
 
 
 def reindexar() -> int:
-    """Reconstruye la colección desde cero con el corpus actual."""
+    """Reconstruye la colección desde cero con la documentación del plan (texto no estructurado).
+
+    Sólo la documentación de la carrera (prosa: 'plan_estudios' = diseño curricular y
+    'contenidos_materia' = contenidos mínimos por materia) se vectoriza; el historial académico y
+    las correlatividades (tabulares) los carga db.reindexar() en la base relacional.
+    """
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
     try:
         client.delete_collection(COLLECTION)
     except Exception:
         pass  # no existía
     col = client.get_or_create_collection(COLLECTION)
-    docs = construir_corpus()
+    VECTOR = {"plan_estudios", "contenidos_materia"}
+    docs = [d for d in construir_corpus() if d["metadata"]["fuente"] in VECTOR]
     col.add(
         ids=[d["id"] for d in docs],
         documents=[d["text"] for d in docs],
@@ -46,19 +58,15 @@ def buscar(consulta: str, k: int = 5, where: dict | None = None) -> list[dict]:
     ]
 
 
-def obtener(where: dict) -> list[dict]:
-    """Trae documentos por filtro de metadata (grounding determinístico, sin semántica)."""
-    res = get_collection().get(where=where)
-    return [{"text": t, "metadata": m} for t, m in zip(res["documents"], res["metadatas"])]
-
-
 if __name__ == "__main__":
     n = reindexar()
-    print(f"Indexados {n} documentos en Chroma ({CHROMA_DIR}).\n")
+    print(f"Indexados {n} documentos (prosa del plan) en Chroma ({CHROMA_DIR}).\n")
+    # Búsquedas semánticas sobre la DOCUMENTACIÓN del plan (lo no estructurado). Las consultas
+    # tabulares (notas de un alumno, correlativas de una materia) las resuelve db.py por SQL.
     for q in [
-        "¿Qué nota se sacó en Bases de Datos?",
-        "¿Qué necesito para cursar Ciencia de Datos?",
-        "materias de programación que aprobó",
+        "régimen de cursada y modalidad del plan de estudios",
+        "perfil profesional del ingeniero en sistemas de información",
+        "alcances del título y campo de actuación",
     ]:
         print(f"### {q}")
         for r in buscar(q, k=3):
