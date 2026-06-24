@@ -89,7 +89,9 @@ python src/figuras.py                       # regenerar figuras
 python scripts/build_notebook.py            # regenerar notebook.ipynb
 python scripts/export_pdf.py                # informe + slides + guión a PDF (Edge/Chrome headless)
 python scripts/build_zip.py                 # .zip de la entrega para Colab
+python scripts/run_eval.py                  # evaluación con/sin RAG → data/eval_resultados.json (requiere Ollama)
 ```
+Para correr la evaluación en Colab (GPU) sin instalar nada: abrí `colab/eval_en_colab.ipynb`.
 </details>
 
 ---
