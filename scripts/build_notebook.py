@@ -261,8 +261,11 @@ else:
 """)
 
 md(r"""
-## 8 · Evaluación — con/sin RAG (demo estrella)
-Medimos el anclaje con **cuatro métricas sobre tres ejes**:
+## 8 · Evaluación — ¿cuánto del contexto usó el modelo?
+**Qué medimos:** cuánto de la respuesta se ancla en el **contexto inyectado** (lo que tomó del RAG)
+y cuánto resuelve el modelo con su **conocimiento propio**. El *grounding* mide esa fracción
+anclada; correr el mismo pedido **con** vs **sin** contexto aísla el aporte del conocimiento privado
+(el salto con−sin). Lo cuantificamos con **cuatro métricas sobre tres ejes**:
 - **Solapamiento** — *grounding léxico* (fracción de tokens informativos de la salida presentes
   literalmente en el contexto; penaliza paráfrasis) y *grounding semántico* (máximo coseno de
   embeddings salida↔contexto; reconoce la reformulación legítima).
@@ -291,6 +294,9 @@ if rag.ollama_disponible():
     cmp = evaluar.comparar_con_sin_rag(generar.recomendar_orientacion, alumno="Mora Gentil")
     con, sin = cmp["con_rag"], cmp["sin_rag"]
     pf = (con.get("precision_factual") or {}).get("precision")
+    print(f"USO DEL CONTEXTO (con RAG): {cmp['uso_contexto_con_rag']:.0%} de la respuesta anclada "
+          f"en el contexto · {cmp['conocimiento_propio_con_rag']:.0%} conocimiento propio")
+    print(f"APORTE DEL RAG (con − sin): +{cmp['aporte_contexto']:.3f} de grounding\n")
     print(f"grounding léxico    CON={con['grounding']}  SIN={sin['grounding']}")
     print(f"grounding semántico CON={con['grounding_sem']}  SIN={sin['grounding_sem']}")
     print(f"precisión factual   CON={pf}  SIN={(sin.get('precision_factual') or {}).get('precision')}")
@@ -298,6 +304,16 @@ if rag.ollama_disponible():
     print("\nResultados agregados (4 artefactos) en data/eval_resultados.json; ver scripts/run_eval.py")
 else:
     print("(LLM apagado) Encendé el modelo (celda 0 en Colab) para la comparación con/sin RAG.")
+""")
+md(r"""
+La figura agrega los 4 artefactos: para cada uno, el grounding **con** vs **sin** RAG. El salto
+entre las barras es **cuánto aportó el contexto inyectado** (lo que el modelo no resolvía solo).
+""")
+code(r"""
+# Figura de la evaluación (usa data/eval_resultados.json; regenerable con scripts/run_eval.py)
+from pathlib import Path
+_p = figuras.FIGS / "aporte_rag.png"
+display(Image(filename=str(_p))) if Path(_p).exists() else print("Corré scripts/run_eval.py para generar la figura.")
 """)
 
 md(r"""

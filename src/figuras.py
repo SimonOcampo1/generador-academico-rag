@@ -11,6 +11,7 @@ Todo es reproducible y offline. Los embeddings se leen de la base vectorial Chro
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -26,6 +27,7 @@ from ingest import get_collection
 
 FIGS = Path(__file__).resolve().parent.parent / "figs"
 FIGS.mkdir(exist_ok=True)
+DATA = Path(__file__).resolve().parent.parent / "data"
 
 # --- Paleta Graphite & Cobalt (misma fuente de verdad que assets/design.css) ---------
 BG = "#FAFAFB"
@@ -202,6 +204,42 @@ def fig_materias_embeddings():
     _save(fig, "materias_embeddings.png")
 
 
+def fig_aporte_rag():
+    """Cuánto del contexto inyectado usó el modelo: grounding CON vs SIN RAG por artefacto.
+
+    Es la figura que pide la consigna de métricas: cuantifica qué parte de la respuesta se ancla en
+    el contexto inyectado (con RAG) frente a lo que el modelo resuelve con su conocimiento propio
+    (sin RAG). El salto con−sin es el aporte del RAG. Lee data/eval_resultados.json (scripts/run_eval.py).
+    """
+    p = DATA / "eval_resultados.json"
+    if not p.exists():
+        print("  [skip] aporte_rag.png (falta data/eval_resultados.json; corré scripts/run_eval.py)")
+        return
+    datos = json.loads(p.read_text(encoding="utf-8"))
+    arts = [d["artefacto"].replace("_", " ") for d in datos]
+    con = [d["grounding_con_rag"] for d in datos]
+    sin = [d["grounding_sin_rag"] for d in datos]
+    fig, ax = plt.subplots(figsize=(9.5, 5.4))
+    x = np.arange(len(arts)); w = 0.38
+    ax.bar(x - w / 2, con, w, label="con RAG (anclado en el contexto)", color=COBALT,
+           edgecolor=BG, linewidth=0.8)
+    ax.bar(x + w / 2, sin, w, label="sin RAG (conocimiento propio del modelo)", color=INK3,
+           edgecolor=BG, linewidth=0.8)
+    for i, (c, s) in enumerate(zip(con, sin)):
+        ax.annotate(f"{c:.2f}", (i - w / 2, c), xytext=(0, 4), textcoords="offset points",
+                    ha="center", fontsize=8.5, color=COBALT, fontfamily=_MONO, fontweight="600")
+        ax.annotate(f"{s:.2f}", (i + w / 2, s), xytext=(0, 4), textcoords="offset points",
+                    ha="center", fontsize=8.5, color=INK2, fontfamily=_MONO)
+    ax.set_xticks(x); ax.set_xticklabels(arts, fontsize=9, color=INK)
+    ax.set_ylim(0, 1.0); ax.set_yticks([0, 0.25, 0.5, 0.75, 1.0])
+    ax.set_ylabel("Grounding (fracción de la salida anclada en el contexto)", color=INK2)
+    ax.grid(axis="y", linewidth=0.7, color=LINE); ax.set_axisbelow(True)
+    ax.legend(frameon=False, fontsize=9, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=2)
+    _titulo(ax, "¿Cuánto del contexto inyectado usó el modelo?",
+            "Grounding con vs sin RAG por artefacto · el salto cuantifica el aporte del conocimiento privado")
+    _save(fig, "aporte_rag.png")
+
+
 def generar_todo():
     grupo = analisis.tabla_grupo()
     perfil = analisis.perfil_por_area(grupo)
@@ -211,6 +249,7 @@ def generar_todo():
     fig_radar(perfil)
     fig_clustering_perfiles(perfil)
     fig_materias_embeddings()
+    fig_aporte_rag()
 
 
 if __name__ == "__main__":

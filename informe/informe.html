@@ -239,6 +239,12 @@ evaluar.py    grounding léxico + semántico + comparar_con_sin_rag()</pre>
 
   <section>
     <h2><span class="n">05</span>Evaluación: grounding con/sin RAG</h2>
+    <p><b>Qué medimos y por qué.</b> El objetivo es cuantificar <b>cuánto del contexto inyectado usa
+      el modelo para responder y cuánto resuelve con su propio conocimiento</b>. Eso es justo lo que
+      captura el <b>grounding</b>: la fracción de la salida anclada en el contexto es lo que el modelo
+      <i>tomó del RAG</i>; el complemento (1&minus;grounding) es redacción o conocimiento propio. Y
+      correr el mismo pedido <b>con</b> vs <b>sin</b> el contexto aísla el aporte del conocimiento
+      privado: el salto entre ambos es cuánto pesó el RAG (Fig. 6).</p>
     <p>Medimos el anclaje con <b>cuatro métricas sobre tres ejes</b>. <b>(a) Solapamiento:</b> el
       <b>grounding léxico</b> es la fracción de tokens informativos de la salida (materias, notas)
       presentes literalmente en el contexto &mdash;explicable, pero penaliza la paráfrasis&mdash; y
@@ -271,6 +277,10 @@ evaluar.py    grounding léxico + semántico + comparar_con_sin_rag()</pre>
       <div class="kpi"><b>0.55<span style="font-size:18px;color:var(--ink-soft)"> / 0.36</span></b><span>grounding léxico con / sin RAG</span></div>
       <div class="kpi"><b>0.57<span style="font-size:18px;color:var(--ink-soft)"> / 0.51</span></b><span>grounding semántico con / sin RAG</span></div>
     </div>
+    <figure>
+      <img src="../figs/aporte_rag.png" alt="Grounding con vs sin RAG por artefacto">
+      <figcaption>Fig. 6 — Cuánto del contexto inyectado usó el modelo: grounding <b>con</b> vs <b>sin</b> RAG por artefacto. El salto con&minus;sin cuantifica el aporte del conocimiento privado (lo que el modelo no podía resolver con su conocimiento propio).</figcaption>
+    </figure>
   </section>
 
   <section>

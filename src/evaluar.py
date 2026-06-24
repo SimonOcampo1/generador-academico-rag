@@ -155,8 +155,15 @@ def comparar_con_sin_rag(generador, **kwargs) -> dict:
     ctx = con["contexto"]
     # Registro real del alumno (si el artefacto es por alumno) para la precisión factual.
     registro = registro_alumno(kwargs["alumno"]) if kwargs.get("alumno") else {}
+    g_con = grounding_score(con["salida"] or "", ctx)
+    g_sin = grounding_score(sin_salida or "", ctx)
     return {
         "artefacto": con.get("artefacto"),
+        # Cuánto del contexto inyectado usó el modelo: grounding con RAG = fracción anclada en el
+        # contexto; (1 - g_con) ≈ lo que puso de su conocimiento propio; el delta con−sin = aporte del RAG.
+        "uso_contexto_con_rag": g_con,
+        "conocimiento_propio_con_rag": round(1 - g_con, 3),
+        "aporte_contexto": round(g_con - g_sin, 3),
         "con_rag": {"salida": con["salida"],
                     "grounding": grounding_score(con["salida"] or "", ctx),
                     "grounding_sem": grounding_semantico(con["salida"] or "", ctx),
