@@ -315,12 +315,19 @@ else:
 md(r"""
 La figura agrega los 4 artefactos: para cada uno, el grounding **con** vs **sin** RAG. El salto
 entre las barras es **cuánto aportó el contexto inyectado** (lo que el modelo no resolvía solo).
+
+> Esta figura grafica un **snapshot precomputado** (`data/eval_resultados.json`). Para **regenerarlo**
+> con una corrida nueva: en **Colab/GPU** corré `colab/eval_en_colab.ipynb`; en **local con Ollama**,
+> `python scripts/run_eval.py`. Ambos reescriben `data/eval_resultados.json` (los 4 artefactos).
 """)
 code(r"""
-# Figura de la evaluación (usa data/eval_resultados.json; regenerable con scripts/run_eval.py)
+# La figura sale de data/eval_resultados.json (snapshot precomputado). Para regenerar esa corrida:
+#   - Colab/GPU:     abrir y ejecutar colab/eval_en_colab.ipynb
+#   - local + Ollama: python scripts/run_eval.py
 from pathlib import Path
 _p = figuras.FIGS / "aporte_rag.png"
-display(Image(filename=str(_p))) if Path(_p).exists() else print("Corré scripts/run_eval.py para generar la figura.")
+display(Image(filename=str(_p))) if Path(_p).exists() else print(
+    "Falta la figura: regenerá los resultados con colab/eval_en_colab.ipynb (Colab) o scripts/run_eval.py (local).")
 """)
 
 md(r"""
