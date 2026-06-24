@@ -105,6 +105,7 @@ python -m uvicorn app.main:app --port 8000   # http://localhost:8000
 python scripts/build_notebook.py && jupyter nbconvert --to notebook --execute --inplace notebook.ipynb
 python src/figuras.py        # regenerar figuras
 python scripts/export_pdf.py # informe + slides + guión a PDF (Edge/Chrome headless)
+python scripts/build_zip.py  # .zip de la entrega para Colab (../Entrega-Grupo14-GeneradorAcademico.zip)
 ```
 
 Modelo local (recomendado para la generación):
