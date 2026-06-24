@@ -28,13 +28,7 @@ respuestas concretas y citadas. El RAG no es un adorno: es el corazón del siste
 
 ## 🧠 Cómo funciona
 
-```
-                        ┌─ tabular (notas, correlativas) → SQLite (relacional) ─┐
-PDFs → extracción → docs ┤                                                      ├─ contexto
-                        └─ prosa + contenidos → embeddings (MiniLM) → Chroma ───┘  combinado
-                                                                                   → LLM (Ollama)
-                                                                                   → respuesta
-```
+<img src="figs/pipeline.png" alt="Pipeline RAG híbrido: PDFs → docs → SQLite (relacional) + Chroma (vectorial) → contexto combinado → LLM → artefacto" width="820">
 
 El historial y las correlatividades se cargan como **filas** en SQLite; el diseño curricular y los
 contenidos de cada materia van como **texto** en Chroma. El retrieval combina lookup relacional +

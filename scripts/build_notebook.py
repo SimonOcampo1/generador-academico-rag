@@ -2,6 +2,7 @@
 
 ponytail: builder one-shot del entregable; regenera el .ipynb desde acá si cambia el pipeline.
 """
+import base64
 from pathlib import Path
 
 import nbformat as nbf
@@ -11,6 +12,11 @@ nb = nbf.v4.new_notebook()
 cells = []
 md = lambda s: cells.append(nbf.v4.new_markdown_cell(s.strip("\n")))
 code = lambda s: cells.append(nbf.v4.new_code_cell(s.strip("\n")))
+
+# Diagrama de arquitectura (figs/pipeline.png) embebido en base64 → se ve en Colab sin que el
+# archivo viaje en el zip. Se regenera con la skill draw.io desde figs/pipeline.drawio.
+_pp = ROOT / "figs" / "pipeline.png"
+_pp_b64 = base64.b64encode(_pp.read_bytes()).decode() if _pp.exists() else ""
 
 md(r"""
 # Generador Académico RAG — Notebook integrador
@@ -33,16 +39,17 @@ md(r"""
 <span style="color:#5B6066">Después: <i>Entorno de ejecución → Ejecutar todo</i> (Ctrl+F9).</span>
 </div>
 """)
-md(r"""
+_diagrama = (f'<img alt="Pipeline RAG hibrido" width="880" '
+             f'src="data:image/png;base64,{_pp_b64}">') if _pp_b64 else (
+    "```\nPDFs -> docs -> (tabular: SQLite | prosa+fichas: MiniLM -> Chroma) "
+    "-> contexto combinado -> LLM -> artefacto\n```")
+md(f"""
 **Por qué híbrido y no todo vectorial:** los datos tabulares (notas, correlativas) se consultan con
 exactitud (lookup/join SQL); la documentación de la carrera (texto largo) es donde los embeddings
 le ganan a un `SELECT`. Cada dato en la base que le corresponde.
 
-```
-                       ┌─ tabular ─────────▶ SQLite  (base relacional) ─┐
-PDFs ─pdfplumber─▶ docs ┤                                               ├─▶ contexto combinado
-                       └─ prosa + fichas ──▶ MiniLM ─▶ Chroma (vector) ─┘   ─▶ LLM ─▶ artefacto
-```
+{_diagrama}
+
 Si no hay GPU/LLM, la parte RAG funciona igual (recupera el contexto) y solo falta la generación.
 """)
 
