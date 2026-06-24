@@ -54,12 +54,38 @@ completa al encender el modelo.
 md(r"""
 ## 0 · Setup
 
-Esta celda prepara el entorno. **En Google Colab** (recomendado: *Entorno de ejecución → GPU T4*)
-instala las dependencias y levanta el modelo en la GPU para ver la generación en vivo. **En local**
-con el repo clonado, solo agrega `src/` al path.
+Dos celdas: **(1) Bootstrap** —en Colab, si el proyecto no está presente, te pide subir el `.zip`
+de la entrega y lo descomprime solo— y **(2) Entorno** —instala dependencias y, en Colab, levanta
+el modelo en la GPU—. **En local** (parado en la carpeta del proyecto) ninguna de las dos hace
+falta tocar: el bootstrap no hace nada y el setup solo agrega `src/` al path.
+""")
+md(r"""
+### Paso 1 · Bootstrap (Colab): subí el `.zip` de la entrega si hace falta
+Si abrís el `.ipynb` suelto en Colab (sin el proyecto), esta celda pide el zip de la entrega
+(`Entrega-Grupo14-GeneradorAcademico.zip`) y lo descomprime, así no hace falta subir nada a Drive.
+""")
+code(r"""
+# Bootstrap (solo Colab): si el proyecto no está presente, pide el .zip de la entrega y lo descomprime.
+# En local no hace nada (ya estás parado en la carpeta del proyecto).
+import os, sys
+from pathlib import Path
 
-> Requisito: el notebook se corre **dentro del proyecto** (con `src/` y `data/raw/`). En Colab,
-> subí la carpeta del proyecto a tu Drive y abrí este `.ipynb` desde ahí, o cloná el repo.
+if "google.colab" in sys.modules and not Path("src").exists():
+    import zipfile
+    from google.colab import files
+    print("Subí el zip de la entrega (Entrega-Grupo14-GeneradorAcademico.zip)…")
+    subido = files.upload()
+    znombre = next(n for n in subido if n.endswith(".zip"))
+    with zipfile.ZipFile(znombre) as z:
+        z.extractall()
+        raiz = z.namelist()[0].split("/")[0]   # carpeta raíz dentro del zip
+    if Path(raiz, "src").exists():
+        os.chdir(raiz)                          # el zip trae una carpeta raíz
+    print("Descomprimido. Carpeta de trabajo:", os.getcwd())
+""")
+md(r"""
+### Paso 2 · Entorno (dependencias + modelo)
+Instala las dependencias y, **en Colab con GPU**, levanta el modelo para ver la generación en vivo.
 """)
 code(r"""
 import os, sys, subprocess, time
@@ -69,8 +95,8 @@ EN_COLAB = "google.colab" in sys.modules
 
 if not Path("src").exists():
     raise RuntimeError(
-        "No encuentro 'src/'. Corré este notebook DESDE la carpeta del proyecto "
-        "(con src/ y data/raw/). En Colab: subí el proyecto a Drive y abrí el .ipynb desde ahí.")
+        "No encuentro 'src/'. En Colab: corré primero la celda de Bootstrap (Paso 1) y subí el "
+        ".zip de la entrega. En local: abrí el notebook DESDE la carpeta del proyecto (con src/ y data/raw/).")
 
 if EN_COLAB:
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", "requirements.txt"])
