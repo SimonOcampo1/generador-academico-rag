@@ -17,3 +17,6 @@ scripts/_*
 
 # Secretos (authtoken ngrok, dominio): NUNCA versionar
 secrets.md
+
+# Notas/prompts locales (no son del proyecto)
+PROMPT.MD
