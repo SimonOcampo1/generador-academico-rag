@@ -232,7 +232,7 @@
         materia-nota que el modelo afirma y lo verificamos contra el registro real. Con RAG da
         <strong>1.0</strong> &mdash;cero notas inventadas&mdash;; sin RAG no cita un solo dato real.
         Y sumamos <em>faithfulness</em>, donde el propio modelo juzga la fidelidad al contexto:
-        <strong>0.73 con RAG contra 0.50 sin</strong>. En las cuatro, con RAG le gana a sin RAG.</p>
+        <strong>0.75 con RAG contra 0.25 sin</strong>. En las cuatro, con RAG le gana a sin RAG.</p>
     </div>
     <div class="claves">
       <div class="h">Claves para estudiar / si te preguntan</div>
@@ -241,8 +241,8 @@
         <li><b>4 métricas / 3 ejes:</b> solapamiento (léxico, semántico), corrección factual (precisión) y juicio de un LLM (faithfulness).</li>
         <li><b>Grounding léxico/semántico:</b> tokens de la salida en el contexto / coseno de embeddings; el semántico reconoce paráfrasis que el léxico penaliza.</li>
         <li><b>Precisión factual (la estrella):</b> de los pares (materia, nota) que afirma, qué fracción coincide con el registro real. Con RAG = <b>1.0</b> (cero inventadas); sin RAG no cita ninguno.</li>
-        <li><b>Faithfulness:</b> un LLM puntúa 0–1 la fidelidad al contexto. <b>0.73 con / 0.50 sin</b>.</li>
-        <li><b>Resultado (4 artefactos, qwen2.5:14B):</b> en las 4 métricas con RAG &gt; sin RAG. Grounding léxico 0.55/0.36, semántico 0.57/0.51.</li>
+        <li><b>Faithfulness:</b> un LLM puntúa 0–1 la fidelidad al contexto. <b>0.75 con / 0.25 sin</b>.</li>
+        <li><b>Resultado (4 artefactos, qwen2.5:14B):</b> en las 4 métricas con RAG &gt; sin RAG. Grounding léxico 0.69/0.22, semántico 0.60/0.53.</li>
         <li><b>Honestidad metodológica:</b> el léxico varía entre corridas (generación estocástica); lo robusto es la dirección y la precisión 1.0. Ninguna métrica detecta contradicciones lógicas sutiles.</li>
         <li><b>Si falla la demo en vivo:</b> mostrar la celda equivalente del notebook.</li>
       </ul>

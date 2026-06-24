@@ -260,22 +260,24 @@ evaluar.py    grounding léxico + semántico + comparar_con_sin_rag()</pre>
       más nítido es la <b>precisión factual</b>: con RAG es <b>1.0</b> &mdash;de cada par (materia,
       nota) que el modelo afirma, el 100% coincide con el registro real: cero notas inventadas&mdash;
       mientras que sin RAG el modelo no cita ningún dato verificable. La <b>faithfulness</b> juzgada
-      por el LLM cae de <b>0.73 con RAG a 0.50 sin RAG</b>, y el grounding de <b>0.55 a 0.36</b>
-      (léxico) y <b>0.57 a 0.51</b> (semántico). En las cuatro métricas, con RAG &gt; sin RAG: la
+      por el LLM cae de <b>0.75 con RAG a 0.25 sin RAG</b>, y el grounding de <b>0.69 a 0.22</b>
+      (léxico) y <b>0.60 a 0.53</b> (semántico). En las cuatro métricas, con RAG &gt; sin RAG: la
       evidencia medible de que el conocimiento privado es el corazón del producto, no un adorno.</p>
     <p>Vale una lectura crítica. El grounding léxico <b>premia la cita literal</b>: un artefacto
       profesional que parafrasea e interpreta (como la carta, que por diseño <i>no</i> enumera notas)
-      obtiene un léxico más bajo aun siendo correcto &mdash;por eso ronda 0.5 y no 1&mdash;; es la
-      razón por la que sumamos la precisión factual, que sí mide acierto. Además, como la generación
-      es estocástica, el valor absoluto de una corrida tiene <b>varianza</b> (entre corridas el léxico
-      osciló ~0.55&ndash;0.64); lo robusto es la <b>dirección</b> (con RAG &gt; sin RAG en las cuatro
-      métricas) y la precisión factual de 1.0. Limitación de fondo: ninguna métrica detecta
-      <i>contradicciones</i> lógicas sutiles, solo cercanía, corrección de pares y un juicio agregado.</p>
+      obtiene un léxico más bajo aun siendo correcto &mdash;ronda 0.6, no 1&mdash;; por eso sumamos la
+      precisión factual, que sí mide acierto. La <b>faithfulness</b> separa bien en promedio (0.75 vs
+      0.25), aunque por artefacto es más gruesa: en los más narrativos (informe, carta) puntúa 1.0
+      con RAG contra 0.0 sin, mientras que en plan y recomendación el juez fue conservador (0.5 en
+      ambos). Como la generación es estocástica, el valor absoluto de una corrida tiene <b>varianza</b>;
+      lo robusto es la <b>dirección</b> (con RAG &gt; sin RAG en las cuatro métricas) y la precisión
+      factual de 1.0. Limitación de fondo: ninguna métrica detecta <i>contradicciones</i> lógicas
+      sutiles, solo cercanía, corrección de pares y un juicio agregado.</p>
     <div class="kpis">
       <div class="kpi"><b>1.0</b><span>precisión factual CON RAG (pares materia-nota correctos)</span></div>
-      <div class="kpi"><b>0.73<span style="font-size:18px;color:var(--ink-soft)"> / 0.50</span></b><span>faithfulness (juez LLM) con / sin RAG</span></div>
-      <div class="kpi"><b>0.55<span style="font-size:18px;color:var(--ink-soft)"> / 0.36</span></b><span>grounding léxico con / sin RAG</span></div>
-      <div class="kpi"><b>0.57<span style="font-size:18px;color:var(--ink-soft)"> / 0.51</span></b><span>grounding semántico con / sin RAG</span></div>
+      <div class="kpi"><b>0.75<span style="font-size:18px;color:var(--ink-soft)"> / 0.25</span></b><span>faithfulness (juez LLM) con / sin RAG</span></div>
+      <div class="kpi"><b>0.69<span style="font-size:18px;color:var(--ink-soft)"> / 0.22</span></b><span>grounding léxico con / sin RAG</span></div>
+      <div class="kpi"><b>0.60<span style="font-size:18px;color:var(--ink-soft)"> / 0.53</span></b><span>grounding semántico con / sin RAG</span></div>
     </div>
     <figure>
       <img src="../figs/aporte_rag.png" alt="Grounding con vs sin RAG por artefacto">

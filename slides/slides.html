@@ -233,12 +233,12 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel);border:1px so
       <div class="vcard on frag">
         <div class="tag">Con RAG</div>
         <p>Cita las materias aprobadas reales, las correlativas y las notas. Genera el plan anclado.</p>
-        <div class="g">grounding léxico 0.64</div>
+        <div class="g">grounding léxico 0.77</div>
       </div>
       <div class="vcard off frag">
         <div class="tag">Sin RAG</div>
         <p>Sin el historial privado, el modelo se generaliza o inventa materias que no existen.</p>
-        <div class="g">grounding léxico 0.25</div>
+        <div class="g">grounding léxico 0.31</div>
       </div>
     </div>
     <p class="frag" style="margin-top:26px;color:var(--muted);">Mismo pedido, un botón. La diferencia es el conocimiento privado.</p>
@@ -250,7 +250,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--panel);border:1px so
     <h2>Medimos el anclaje</h2>
     <div class="metrics" style="margin-top:26px;">
       <div class="metric frag"><div class="num">1.0</div><div class="lbl"><strong>precisión factual</strong> con RAG: cada par (materia, nota) que afirma coincide con el registro real. Sin RAG no cita ninguno.</div></div>
-      <div class="metric frag"><div class="num">0.73→0.50</div><div class="lbl"><strong>faithfulness</strong>: un LLM juzga la fidelidad al contexto. Con RAG vs. sin RAG.</div></div>
+      <div class="metric frag"><div class="num">0.75→0.25</div><div class="lbl"><strong>faithfulness</strong>: un LLM juzga la fidelidad al contexto. Con RAG vs. sin RAG.</div></div>
       <div class="metric frag"><div class="num">4 / 4</div><div class="lbl">métricas donde <strong>con RAG &gt; sin RAG</strong> (léxico, semántico, precisión, faithfulness).</div></div>
     </div>
     <p class="frag" style="margin-top:32px;max-width:66ch;">Cuatro métricas en tres ejes: <em>solapamiento</em> (léxico/semántico), <em>corrección factual</em> (precisión) y <em>juicio de un LLM</em> (faithfulness). La estrella: <strong>cero notas inventadas con RAG</strong>. El valor absoluto tiene varianza; lo robusto es la dirección.</p>
