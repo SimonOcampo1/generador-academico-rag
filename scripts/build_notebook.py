@@ -16,39 +16,34 @@ md(r"""
 # Generador Académico RAG — Notebook integrador
 **TP Integrador de Ciencia de Datos · UTN FRLP 2026 · Grupo 14**
 
-Sistema de IA generativa que, alimentado por **dos bases de datos** —una **relacional** con el
-**historial académico real** del grupo + las **correlatividades** del plan, y una **vectorial**
-con la **documentación** de la carrera— genera *artefactos académicos personalizados* (planes de
-cursada, informes, cartas de pasantía, recomendaciones, diagnóstico grupal, simulaciones). No
-responde preguntas: **sintetiza documentos nuevos** anclados en datos privados que el modelo no
-conoce.
+Sistema de IA generativa con **persistencia híbrida** —base **relacional** (SQLite: historial +
+correlatividades) + base **vectorial** (Chroma: documentación y contenidos de materias)— que
+**combina ambas** y *sintetiza* artefactos académicos personalizados (planes de cursada, informes,
+cartas, recomendaciones). No responde preguntas: genera documentos nuevos anclados en datos
+privados que el modelo no conoce.
+""")
+md(r"""
+<div style="background:#FFF8E1;border-left:6px solid #E0A100;padding:14px 18px;border-radius:8px;font-size:15px;line-height:1.5">
+<b>⚠️ Antes de ejecutar — leé esto</b>
+<ol style="margin:8px 0 0;padding-left:20px">
+<li>🖥️ <b>Activá la GPU T4</b>: <i>Entorno de ejecución → Cambiar tipo de entorno → <b>T4 GPU</b></i>. Sin esto la generación no corre en GPU.</li>
+<li>⏳ <b>Tené paciencia</b>: la corrida completa tarda <b>unos minutos</b> (instala dependencias y carga el modelo en la GPU; la 1ª generación es la más lenta).</li>
+<li>📦 <b>El Paso 1 te pide el proyecto</b>: cuando lo pida, subí el archivo <code>Entrega-Grupo14-GeneradorAcademico.zip</code> (trae <code>src/</code> y <code>data/raw/</code>). Lo descomprime solo.</li>
+</ol>
+<span style="color:#5B6066">Después: <i>Entorno de ejecución → Ejecutar todo</i> (Ctrl+F9).</span>
+</div>
+""")
+md(r"""
+**Por qué híbrido y no todo vectorial:** los datos tabulares (notas, correlativas) se consultan con
+exactitud (lookup/join SQL); la documentación de la carrera (texto largo) es donde los embeddings
+le ganan a un `SELECT`. Cada dato en la base que le corresponde.
 
-### Persistencia híbrida: cada dato en la base que le corresponde
-- **Base relacional (SQLite):** los datos **tabulares** —alumno, materia, nota, año, estado y las
-  36 correlatividades (Anexo I)—. Son registros estructurados: se consultan con exactitud
-  (filtros, joins, agregaciones), no con similitud semántica.
-- **Base vectorial (Chroma):** la **documentación** del plan (prosa: régimen, perfil, alcances).
-  Texto largo no estructurado, donde el matching semántico le gana a un `SELECT`.
-
-El agente **combina ambas** para armar su contexto. (Antes todo iba a la vectorial; meter datos
-tabulares ahí era usar embeddings para lo que es un lookup determinístico.)
-
-### Por qué es generativo y no un SQL
-Un SQL te dice *qué* materias podés cursar (lookup). Esto te dice *qué conviene y por qué*,
-redactado, con tono controlable, cruzando notas + correlativas + rendimiento. La salida es
-texto nuevo sintetizado, no un campo de una tabla.
-
-### Pipeline (lo construimos nosotros, no es NotebookLM)
 ```
-                       ┌─ datos tabulares ─▶ SQLite  (base relacional) ─┐
-PDFs ─pdfplumber─▶ docs ┤                                               ├─▶ contexto
-                       └─ prosa del plan ──▶ MiniLM ─▶ Chroma (vector) ─┘   combinado
-                                                                            │
-                                          qwen2.5:14B (Ollama) ◀────────────┘ ─▶ artefacto
+                       ┌─ tabular ─────────▶ SQLite  (base relacional) ─┐
+PDFs ─pdfplumber─▶ docs ┤                                               ├─▶ contexto combinado
+                       └─ prosa + fichas ──▶ MiniLM ─▶ Chroma (vector) ─┘   ─▶ LLM ─▶ artefacto
 ```
-El pipeline RAG corre **local**; la **generación** corre en una GPU (en Colab, la T4 gratuita).
-Si el LLM está apagado, la parte RAG funciona igual (recupera el contexto) y la generación se
-completa al encender el modelo.
+Si no hay GPU/LLM, la parte RAG funciona igual (recupera el contexto) y solo falta la generación.
 """)
 
 md(r"""
@@ -60,28 +55,39 @@ el modelo en la GPU—. **En local** (parado en la carpeta del proyecto) ninguna
 falta tocar: el bootstrap no hace nada y el setup solo agrega `src/` al path.
 """)
 md(r"""
-### Paso 1 · Bootstrap (Colab): subí el `.zip` de la entrega si hace falta
-Si abrís el `.ipynb` suelto en Colab (sin el proyecto), esta celda pide el zip de la entrega
-(`Entrega-Grupo14-GeneradorAcademico.zip`) y lo descomprime, así no hace falta subir nada a Drive.
+### Paso 1 · Cargar el proyecto (Colab)
+Cuando esta celda lo pida, **subí `Entrega-Grupo14-GeneradorAcademico.zip`** (el zip de la entrega;
+contiene `src/` y `data/raw/`). La celda lo descomprime sola — no hay que tocar nada más.
+
+> *Alternativa con Drive:* subí esa **carpeta `generador-academico-rag/`** a tu Drive, y al inicio
+> de esta celda agregá `from google.colab import drive; drive.mount('/content/drive')` y
+> `os.chdir('/content/drive/MyDrive/generador-academico-rag')`. En **local** esta celda no hace nada.
 """)
 code(r"""
 # Bootstrap (solo Colab): si el proyecto no está presente, pide el .zip de la entrega y lo descomprime.
-# En local no hace nada (ya estás parado en la carpeta del proyecto).
 import os, sys
 from pathlib import Path
 
 if "google.colab" in sys.modules and not Path("src").exists():
     import zipfile
     from google.colab import files
-    print("Subí el zip de la entrega (Entrega-Grupo14-GeneradorAcademico.zip)…")
+    print("Subí el .zip de la entrega: Entrega-Grupo14-GeneradorAcademico.zip")
     subido = files.upload()
-    znombre = next(n for n in subido if n.endswith(".zip"))
-    with zipfile.ZipFile(znombre) as z:
+    zips = [n for n in subido if n.endswith(".zip")]
+    if not zips:
+        raise RuntimeError(
+            "No subiste ningún .zip. Subí 'Entrega-Grupo14-GeneradorAcademico.zip' (debe contener "
+            "src/ y data/raw/) y volvé a correr esta celda.")
+    with zipfile.ZipFile(zips[0]) as z:
         z.extractall()
         raiz = z.namelist()[0].split("/")[0]   # carpeta raíz dentro del zip
     if Path(raiz, "src").exists():
-        os.chdir(raiz)                          # el zip trae una carpeta raíz
-    print("Descomprimido. Carpeta de trabajo:", os.getcwd())
+        os.chdir(raiz)                          # el zip trae una carpeta raíz: entrar en ella
+    if not Path("src").exists():
+        raise RuntimeError(
+            "El .zip no contenía 'src/'. Subí el zip correcto (Entrega-Grupo14-GeneradorAcademico.zip, "
+            "armado con scripts/build_zip.py).")
+    print("✅ Proyecto cargado. Carpeta de trabajo:", os.getcwd())
 """)
 md(r"""
 ### Paso 2 · Entorno (dependencias + modelo)

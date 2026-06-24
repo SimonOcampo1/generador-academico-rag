@@ -119,10 +119,13 @@ def precision_factual(salida: str, registro: dict[str, int]) -> dict | None:
 
 # --- Faithfulness con LLM como juez: el propio modelo puntúa la fidelidad al contexto ------------
 _JUEZ = (
-    "Sos un evaluador estricto de sistemas RAG. Puntuás de 0.0 a 1.0 qué tan FIEL es la RESPUESTA "
-    "al CONTEXTO: 1.0 = toda afirmación factual (materias, notas, correlativas) está respaldada por "
-    "el contexto; 0.5 = mezcla datos del contexto con afirmaciones no verificables; 0.0 = inventa o "
-    "contradice el contexto. Respondé ÚNICAMENTE el número, sin texto."
+    "Sos un evaluador de sistemas RAG. Puntuás de 0.0 a 1.0 la FIDELIDAD de la RESPUESTA al "
+    "CONTEXTO mirando SOLO los DATOS CONCRETOS que afirma (materias, notas, años, correlativas):\n"
+    "1.0 = todos los datos concretos que menciona aparecen en el CONTEXTO;\n"
+    "0.5 = mayormente apoyada, pero con algún dato concreto que no está en el contexto;\n"
+    "0.0 = inventa o contradice datos (materias/notas que no están en el contexto).\n"
+    "IMPORTANTE: la interpretación, los consejos y las opiniones NO se penalizan; no exijas que "
+    "cada oración sea verificable, penalizá únicamente DATOS inventados. Respondé SOLO el número."
 )
 
 

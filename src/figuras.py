@@ -171,12 +171,18 @@ def fig_clustering_perfiles(perfil, k=3):
 
 
 def fig_materias_embeddings():
-    """t-SNE de los embeddings de las 36 obligatorias, coloreado por área."""
+    """t-SNE de los embeddings de las 36 obligatorias (fichas de contenidos), coloreado por área."""
     col = get_collection()
-    got = col.get(where={"fuente": "correlatividades"}, include=["embeddings", "metadatas"])
+    # Embeddings de las fichas de materia (fuente 'contenidos_materia'); las correlatividades viven
+    # ahora en la base relacional, no en Chroma. Las fichas dan un espacio semántico más rico.
+    got = col.get(where={"fuente": "contenidos_materia"}, include=["embeddings", "metadatas"])
     emb = np.array(got["embeddings"]); metas = got["metadatas"]
+    if len(emb) < 3:
+        print("  [skip] materias_embeddings.png (sin fichas de materia en Chroma; corré ingest.reindexar)")
+        return
     areas = [analisis.area_de(m["materia"]) for m in metas]
-    xy = TSNE(n_components=2, random_state=14, perplexity=8, init="pca").fit_transform(emb)
+    perplexity = min(8, len(emb) - 1)  # t-SNE exige perplexity < n_samples
+    xy = TSNE(n_components=2, random_state=14, perplexity=perplexity, init="pca").fit_transform(emb)
     fig, ax = plt.subplots(figsize=(10.5, 8))
     cats = sorted(set(areas))
     for i, area in enumerate(cats):
