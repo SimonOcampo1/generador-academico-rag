@@ -290,18 +290,25 @@ print("precisión — anclada:", evaluar.precision_factual(anclada, registro)["p
 """)
 code(r"""
 # Demo estrella CON vs SIN RAG sobre un artefacto real (requiere el LLM encendido)
+_fmt = lambda x: "—" if x is None else x
 if rag.ollama_disponible():
-    cmp = evaluar.comparar_con_sin_rag(generar.recomendar_orientacion, alumno="Mora Gentil")
+    # OJO: es 1 corrida estocástica de 1 artefacto, ilustrativa. Los números ROBUSTOS son el
+    # promedio de 4 artefactos (la figura de abajo / data/eval_resultados.json).
+    cmp = evaluar.comparar_con_sin_rag(generar.informe_trayectoria, alumno="Santiago Natalichio", tono="honesto")
     con, sin = cmp["con_rag"], cmp["sin_rag"]
-    pf = (con.get("precision_factual") or {}).get("precision")
-    print(f"USO DEL CONTEXTO (con RAG): {cmp['uso_contexto_con_rag']:.0%} de la respuesta anclada "
-          f"en el contexto · {cmp['conocimiento_propio_con_rag']:.0%} conocimiento propio")
+    pf_c = (con.get("precision_factual") or {}).get("precision")
+    pf_s = (sin.get("precision_factual") or {}).get("precision")
+    print("Artefacto de muestra: informe_trayectoria (Santiago Natalichio)\n")
+    print(f"USO DEL CONTEXTO (con RAG): {cmp['uso_contexto_con_rag']:.0%} anclado en el contexto · "
+          f"{cmp['conocimiento_propio_con_rag']:.0%} conocimiento propio")
     print(f"APORTE DEL RAG (con − sin): +{cmp['aporte_contexto']:.3f} de grounding\n")
     print(f"grounding léxico    CON={con['grounding']}  SIN={sin['grounding']}")
     print(f"grounding semántico CON={con['grounding_sem']}  SIN={sin['grounding_sem']}")
-    print(f"precisión factual   CON={pf}  SIN={(sin.get('precision_factual') or {}).get('precision')}")
+    print(f"precisión factual   CON={_fmt(pf_c)}  SIN={_fmt(pf_s)}   (— = no afirmó pares materia-nota)")
     print(f"faithfulness (juez) CON={con.get('faithfulness')}  SIN={sin.get('faithfulness')}")
-    print("\nResultados agregados (4 artefactos) en data/eval_resultados.json; ver scripts/run_eval.py")
+    print("\nNOTA: 1 corrida estocástica de 1 artefacto → puede diferir de la figura de abajo.")
+    print("Lo robusto es el AGREGADO de 4 artefactos (figura siguiente · data/eval_resultados.json).")
+    print("Faithfulness por artefacto es gruesa (0 / 0.5 / 1); el promedio de los 4 sí separa (0.75 vs 0.25).")
 else:
     print("(LLM apagado) Encendé el modelo (celda 0 en Colab) para la comparación con/sin RAG.")
 """)
