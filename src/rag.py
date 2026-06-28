@@ -1,9 +1,9 @@
 """RAG: recupera contexto de las DOS bases de datos y genera la respuesta con el LLM local.
 
 Flujo: consulta -> retrieval HÍBRIDO (base relacional db.py + base vectorial ingest.buscar)
--> prompt con contexto -> Phi-4-mini vía Ollama.
+-> prompt con contexto -> LLM vía Ollama.
 Si Ollama no está corriendo, devuelve el contexto recuperado (la parte RAG funciona igual).
-Modelo local configurable por OLLAMA_MODEL; default phi4-mini (3.8B).
+Modelo configurable por OLLAMA_MODEL: qwen2.5:14b en GPU (Colab), default phi4-mini (3.8B) en CPU.
 """
 from __future__ import annotations
 

@@ -77,15 +77,16 @@
         correlativas, <strong>tu</strong> avance. Eso es justo lo que resolvimos.</p>
 
       <div class="cue">Slide 2 · El problema</div>
-      <p>Y acá la primera aclaración importante, porque es la crítica que nos íbamos a comer:
-        "che, eso lo hace un SQL". Y es verdad… <em>si</em> el producto fueran consultas tipo
-        "¿qué nota tengo en Bases de Datos?". Eso es <strong>lookup</strong>, buscar un dato, no
-        es IA generativa.</p>
-      <p>Nuestro reencuadre fue ese: el producto no son respuestas, son <strong>artefactos nuevos
-        generados</strong> (un plan justificado, un informe, una carta de pasantía). El SQL te
-        dice qué <em>podés</em> cursar; nuestro sistema te dice qué <em>conviene</em> y por qué,
-        redactado. Y tampoco es NotebookLM: la gracia del TP es que el pipeline RAG lo
-        <strong>construimos nosotros</strong> y lo mostramos. Mis compañeros lo van desarmando.</p>
+      <p>Para que se entienda de entrada qué construimos: el sistema usa <strong>dos bases</strong>.
+        Lo tabular &mdash;tus notas, tus correlativas&mdash; vive en una base <strong>relacional</strong>,
+        y ahí un SQL hace lo suyo: lo exacto. Esa es la mitad correcta del problema, y la usamos tal
+        cual.</p>
+      <p>Pero el producto no es esa consulta: es lo que <strong>generamos encima</strong>, combinando
+        esos datos con la documentación del plan. No son respuestas, son <strong>artefactos nuevos</strong>
+        (un plan de cursada justificado, un informe, una carta de pasantía). El SQL te dice qué
+        <em>podés</em> cursar; nuestro sistema redacta qué te <em>conviene</em> y por qué. Y tampoco
+        es NotebookLM: la gracia del TP es que el pipeline RAG lo <strong>construimos nosotros</strong>
+        y lo mostramos. Mis compañeros lo van desarmando.</p>
     </div>
     <div class="claves">
       <div class="h">Claves para estudiar / si te preguntan</div>
@@ -165,8 +166,9 @@
       <p>¿Y cómo sabemos que los embeddings funcionan? Proyectamos las 36 materias con
         <strong>t-SNE</strong> y se ve que las de la misma área caen juntas. Eso valida que el
         espacio capturó la estructura del plan, y es lo que habilita el recomendador por
-        <em>matching semántico</em>: cruzar dónde te fue bien con materias afines. Eso un SQL no
-        lo puede hacer; necesita similitud sobre texto.</p>
+        <em>matching semántico</em>: cruzar dónde te fue bien con materias afines por su contenido.
+        Esa afinidad por significado es lo que aporta la base vectorial: la mitad semántica que
+        complementa al lookup exacto de la relacional.</p>
     </div>
     <div class="claves">
       <div class="h">Claves para estudiar / si te preguntan</div>
@@ -196,8 +198,8 @@
         En <em>técnico</em> es seco y preciso. En <em>motivacional</em> te destaca el logro. En
         <em>honesto</em> te marca también la debilidad sin vueltas.</p>
       <p>Los datos son idénticos, salen del mismo contexto. Lo único que cambia es cómo se redacta.
-        Eso es exactamente lo que un reporte fijo o un SQL no pueden darte: es síntesis de texto,
-        no una consulta.</p>
+        Eso es síntesis de texto: el mismo dato del contexto, redactado en distinto registro. Es lo
+        propio de un sistema generativo, no de un reporte fijo.</p>
     </div>
     <div class="claves">
       <div class="h">Claves para estudiar / si te preguntan</div>
@@ -243,6 +245,7 @@
         <li><b>Precisión factual (la estrella):</b> de los pares (materia, nota) que afirma, qué fracción coincide con el registro real. Con RAG = <b>1.0</b> (cero inventadas); sin RAG no cita ninguno.</li>
         <li><b>Faithfulness:</b> un LLM puntúa 0–1 la fidelidad al contexto. <b>0.75 con / 0.25 sin</b>.</li>
         <li><b>Resultado (4 artefactos, qwen2.5:14B):</b> en las 4 métricas con RAG &gt; sin RAG. Grounding léxico 0.69/0.22, semántico 0.60/0.53.</li>
+        <li><b>Calidad del retriever (recuperación sola, sin LLM):</b> hit-rate y MRR sobre 12 consultas-tema → hit-rate@1 <b>0.92</b>, MRR <b>0.92</b>. Subió desde 0.50/0.68 al limpiar el texto que se vectoriza (sacar el boilerplate que las 36 fichas repetían y dejar nombre + contenidos mínimos): mejor preprocesamiento, no truco. Probamos además un embedder multilingüe (e5-large): da recuperación <b>perfecta (1.00)</b>, pero lo dejamos opcional porque pesa 2.2 GB frente al MiniLM liviano y offline del default.</li>
         <li><b>Honestidad metodológica:</b> el léxico varía entre corridas (generación estocástica); lo robusto es la dirección y la precisión 1.0. Ninguna métrica detecta contradicciones lógicas sutiles.</li>
         <li><b>Si falla la demo en vivo:</b> mostrar la celda equivalente del notebook.</li>
       </ul>

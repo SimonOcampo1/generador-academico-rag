@@ -1,0 +1,72 @@
+{
+  "resumen": {
+    "n": 12,
+    "k": 5,
+    "hit_rate@1": 0.917,
+    "hit_rate@3": 0.917,
+    "hit_rate@5": 0.917,
+    "mrr": 0.917
+  },
+  "detalle": [
+    {
+      "consulta": "control de versiones, pruebas de software, aseguramiento y modelos de calidad",
+      "esperada": "Ingeniería y Calidad de Software",
+      "rank": 1
+    },
+    {
+      "consulta": "gestión de riesgos, auditoría, marco normativo y peritaje informático forense",
+      "esperada": "Seguridad en los Sistemas de Información",
+      "rank": 1
+    },
+    {
+      "consulta": "modelo relacional, normalización de tablas, lenguaje de consultas y transacciones",
+      "esperada": "Bases de Datos",
+      "rank": 0
+    },
+    {
+      "consulta": "límites, derivadas e integrales de funciones de una variable",
+      "esperada": "Análisis Matemático I",
+      "rank": 1
+    },
+    {
+      "consulta": "protocolos de red, modelo de capas, ruteo y conmutación de paquetes",
+      "esperada": "Redes de Datos",
+      "rank": 1
+    },
+    {
+      "consulta": "procesos, planificación de CPU, memoria virtual y sistemas de archivos",
+      "esperada": "Sistemas Operativos",
+      "rank": 1
+    },
+    {
+      "consulta": "aprendizaje automático, modelos predictivos y análisis de grandes volúmenes de datos",
+      "esperada": "Ciencia de Datos",
+      "rank": 1
+    },
+    {
+      "consulta": "agentes inteligentes, búsqueda heurística y representación del conocimiento",
+      "esperada": "Inteligencia Artificial",
+      "rank": 1
+    },
+    {
+      "consulta": "vectores, matrices, espacios vectoriales y transformaciones lineales",
+      "esperada": "Álgebra y Geometría Analítica",
+      "rank": 1
+    },
+    {
+      "consulta": "patrones de diseño, arquitectura de software y experiencia de usuario",
+      "esperada": "Diseño de Sistemas de Información",
+      "rank": 1
+    },
+    {
+      "consulta": "variables aleatorias, distribuciones de probabilidad e inferencia estadística",
+      "esperada": "Probabilidad y Estadística",
+      "rank": 1
+    },
+    {
+      "consulta": "paradigma funcional, orientado a objetos y lógico de la programación",
+      "esperada": "Paradigmas de Programación",
+      "rank": 1
+    }
+  ]
+}

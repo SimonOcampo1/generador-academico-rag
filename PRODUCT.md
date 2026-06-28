@@ -28,7 +28,7 @@ entregables de comunicación (informe, slides, guión) comparten el mismo sistem
 - Ingesta corpus mixto y lo persiste según su naturaleza: tabular (notas, años, correlativas)
   → base relacional SQLite; no estructurado (prosa del plan) → base vectorial Chroma.
 - Pipeline RAG propio: PDFs → pdfplumber → documentos → (SQLite + embeddings MiniLM/Chroma) →
-  retrieval híbrido (SQL + semántico) → Phi-4-mini vía Ollama (fallback a solo-retrieval si apagado).
+  retrieval híbrido (SQL + semántico) → LLM vía Ollama (qwen2.5:14b en GPU · phi4-mini en CPU; fallback a solo-retrieval si apagado).
 - 6 generadores de artefactos con **tono controlable** (técnico / motivacional / honesto).
 - EDA + visualización + clustering de perfiles (KMeans, t-SNE de embeddings).
 - Evaluación de **grounding** y **demo estrella con RAG / sin RAG**.

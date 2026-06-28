@@ -295,6 +295,49 @@ registro = {"bases de datos": 9, "analisis matematico i": 9}
 print("precisión — anclada:", evaluar.precision_factual(anclada, registro)["precision"],
       "| inventada:", evaluar.precision_factual(inventada, registro))
 """)
+md(r"""
+### Calidad del *retriever*: hit-rate y MRR
+Las métricas de arriba evalúan la **generación**. Esta evalúa la **recuperación** sola (no usa el
+LLM ni GPU): para 12 consultas-tema —redactadas **sin** nombrar la materia, para forzar match
+semántico y no léxico— se mide si la ficha de la materia esperada aparece en el top-5 de la base
+vectorial. *hit-rate@k* = fracción con la materia esperada entre los k primeros; *MRR* = media de
+1/rango del primer acierto.
+""")
+code(r"""
+# Evaluación del retriever (solo recuperación, sin LLM). Reusa ingest.buscar + documents.canon.
+from documents import canon
+GOLD = [
+    ("control de versiones, pruebas de software, aseguramiento y modelos de calidad", "Ingeniería y Calidad de Software"),
+    ("gestión de riesgos, auditoría, marco normativo y peritaje informático forense", "Seguridad en los Sistemas de Información"),
+    ("modelo relacional, normalización de tablas, lenguaje de consultas y transacciones", "Bases de Datos"),
+    ("límites, derivadas e integrales de funciones de una variable", "Análisis Matemático I"),
+    ("protocolos de red, modelo de capas, ruteo y conmutación de paquetes", "Redes de Datos"),
+    ("procesos, planificación de CPU, memoria virtual y sistemas de archivos", "Sistemas Operativos"),
+    ("aprendizaje automático, modelos predictivos y análisis de grandes volúmenes de datos", "Ciencia de Datos"),
+    ("agentes inteligentes, búsqueda heurística y representación del conocimiento", "Inteligencia Artificial"),
+    ("vectores, matrices, espacios vectoriales y transformaciones lineales", "Álgebra y Geometría Analítica"),
+    ("patrones de diseño, arquitectura de software y experiencia de usuario", "Diseño de Sistemas de Información"),
+    ("variables aleatorias, distribuciones de probabilidad e inferencia estadística", "Probabilidad y Estadística"),
+    ("paradigma funcional, orientado a objetos y lógico de la programación", "Paradigmas de Programación"),
+]
+def _rank(consulta, esperada, k=5):
+    hits = ingest.buscar(consulta, k=k, where={"fuente": "contenidos_materia"})
+    obj = canon(esperada)
+    for i, h in enumerate(hits, 1):
+        if canon(h["metadata"].get("materia", "")) == obj:
+            return i
+    return 0
+ranks = [_rank(q, e) for q, e in GOLD]
+n = len(ranks)
+hit1 = sum(r == 1 for r in ranks) / n
+hit3 = sum(1 <= r <= 3 for r in ranks) / n
+hit5 = sum(1 <= r <= 5 for r in ranks) / n
+mrr = sum((1 / r) if r else 0 for r in ranks) / n
+print(f"Retriever sobre {n} consultas-tema (top-5, fichas de materia):")
+print(f"  hit-rate@1={hit1:.2f}   hit-rate@3={hit3:.2f}   hit-rate@5={hit5:.2f}   MRR={mrr:.3f}\n")
+for (q, e), r in zip(GOLD, ranks):
+    print(f"  [{'ok' if r == 1 else ('#%d' % r if r else 'MISS'):>4}] {e}")
+""")
 code(r"""
 # Demo estrella CON vs SIN RAG sobre un artefacto real (requiere el LLM encendido)
 _fmt = lambda x: "—" if x is None else x

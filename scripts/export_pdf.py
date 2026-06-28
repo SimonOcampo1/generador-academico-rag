@@ -22,6 +22,7 @@ DOCS = [
     ("informe/informe.html", "informe/Informe-Tecnico.pdf"),
     ("slides/slides.html", "slides/Presentacion.pdf"),
     ("guion/guion.html", "guion/Guion-Presentacion.pdf"),
+    ("estudio/guia-estudio.html", "estudio/Guia-Estudio.pdf"),
 ]
 
 

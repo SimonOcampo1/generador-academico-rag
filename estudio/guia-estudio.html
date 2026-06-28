@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Guía de estudio · Generador Académico RAG · Grupo 14</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* Guía de estudio interna — sistema visual Graphite & Cobalt (DESIGN.md),
+     estructura editorial tp-academico. Render: Edge/Chrome headless (scripts/export_pdf.py). */
+  :root{
+    --bg:#FAFAFB; --ink:#0E0F12; --ink-soft:#5B6066; --muted:#8B9099;
+    --line:#E6E7EB; --line-soft:#F0F1F4; --surface:#F2F3F6;
+    --cobalt:#3A5BFF; --cobalt2:#2440D8; --cobalt-soft:#E7EBFF;
+    --teal:#00A6A6; --amber:#E0A100; --acero:#7C8AA5; --violeta:#9B6DFF;
+    --display:'Space Grotesk','Segoe UI',sans-serif; --sans:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:10.2pt;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .doc{max-width:850px;margin:0 auto;padding:40px 44px 56px;}
+  strong{font-weight:600;} em{color:var(--cobalt);font-style:normal;font-weight:500;}
+  code{font-family:var(--mono);font-size:.86em;background:var(--surface);padding:1px 5px;border-radius:4px;color:var(--ink);}
+
+  /* Portada */
+  .cover{position:relative;display:flex;flex-direction:column;justify-content:center;padding:60px 0 40px 18px;}
+  .cover .bar{position:absolute;top:0;left:-6px;width:6px;height:100%;background:linear-gradient(180deg,var(--cobalt),var(--teal));border-radius:3px;}
+  .kick{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--cobalt);}
+  .cover h1{font-family:var(--display);font-weight:600;font-size:46px;line-height:1.03;letter-spacing:-.03em;margin:14px 0 0;}
+  .cover h1 .c{color:var(--cobalt);}
+  .cover .sub{font-size:16px;color:var(--ink-soft);max-width:60ch;margin-top:18px;line-height:1.5;}
+  .cover .meta{margin-top:42px;display:grid;grid-template-columns:auto 1fr;gap:6px 26px;font-size:12.5px;color:var(--ink-soft);}
+  .cover .meta b{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+  .cover .meta span strong{color:var(--ink);}
+
+  /* Secciones */
+  section{margin-top:30px;}
+  h2{font-family:var(--display);font-size:18px;font-weight:600;letter-spacing:-.01em;margin:0 0 12px;padding-top:12px;border-top:1px solid var(--line);display:flex;align-items:baseline;gap:12px;}
+  h2 .n{font-family:var(--mono);font-size:13px;color:var(--cobalt);font-weight:500;}
+  h3{font-family:var(--display);font-size:13.5px;font-weight:600;margin:16px 0 6px;color:var(--ink);}
+  p{max-width:74ch;margin:0 0 9px;}
+  .lead{font-size:11.5pt;color:var(--ink);}
+  ul{margin:0 0 9px;padding-left:18px;} li{margin:5px 0;max-width:72ch;}
+
+  /* one-liner destacado */
+  .tldr{background:var(--cobalt-soft);border-radius:10px;padding:16px 20px;margin:4px 0 8px;}
+  .tldr p{margin:0;font-size:11.5pt;color:var(--ink);max-width:none;}
+
+  /* KPIs */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:12px 0;}
+  .kpi{border-top:2px solid var(--cobalt);padding-top:8px;}
+  .kpi b{font-family:var(--display);font-weight:600;font-size:24px;display:block;line-height:1;letter-spacing:-.02em;}
+  .kpi span{display:block;margin-top:6px;font-size:10px;color:var(--ink-soft);line-height:1.35;}
+
+  /* tablas */
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:9.6pt;}
+  th{background:var(--ink);color:#fff;font-weight:600;text-align:left;padding:7px 10px;font-size:9pt;letter-spacing:.01em;}
+  td{padding:6px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tr:nth-child(even) td{background:var(--surface);}
+  td.term{font-weight:600;color:var(--cobalt2);white-space:nowrap;}
+
+  /* callout */
+  .callout{border:1px solid var(--line);border-left:3px solid var(--cobalt);background:#fff;border-radius:8px;padding:12px 16px;margin:12px 0;}
+  .callout .h{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--cobalt);margin-bottom:5px;}
+  .callout.warn{border-left-color:var(--amber);} .callout.warn .h{color:var(--amber);}
+
+  /* diagrama */
+  .diagram{border:1px solid var(--line);border-radius:10px;background:#fff;padding:14px 16px 8px;margin:12px 0;}
+  .diagram .cap{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;}
+  svg{display:block;width:100%;height:auto;}
+
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .chip{display:inline-block;font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);margin:2px 3px 2px 0;}
+
+  @media print{
+    @page{size:A4;margin:15mm 15mm 14mm;}
+    body{background:#fff;font-size:10pt;}
+    .doc{max-width:none;padding:0;}
+    .cover{min-height:92vh;page-break-after:always;}
+    section{page-break-inside:auto;}
+    h2{page-break-after:avoid;} h3{page-break-after:avoid;}
+    .diagram,.kpis,table,.callout,.tldr{page-break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<article class="doc">
+
+  <!-- PORTADA -->
+  <header class="cover">
+    <span class="bar"></span>
+    <span class="kick">Guía de estudio interna · para preparar la exposición</span>
+    <h1>Generador Académico <span class="c">RAG</span></h1>
+    <p class="sub">Todo lo que hay que entender del trabajo —la propuesta, los conceptos, cómo se
+      construyó, las tecnologías y los resultados— en una lectura corta y clara, antes de la defensa
+      oral.</p>
+    <div class="meta">
+      <b>Materia</b><span>Ciencia de Datos · UTN FRLP · 2026</span>
+      <b>Grupo</b><span><strong>Grupo 14</strong> · Martin · Gentil · Natalichio · Cuenca · Ocampo · Aubert</span>
+      <b>Cómo usar</b><span>Leéla entera una vez; después repasá tu sección (§9) y las preguntas del jurado (§10).</span>
+    </div>
+  </header>
+
+  <!-- 1 · LA PROPUESTA -->
+  <section>
+    <h2><span class="n">01</span>La propuesta, en una frase</h2>
+    <div class="tldr"><p>Un sistema de <strong>IA generativa</strong> que, combinando una base de
+      datos <strong>relacional</strong> (nuestras notas y correlatividades reales) con una base
+      <strong>vectorial</strong> (la documentación de la carrera), <strong>genera documentos
+      académicos personalizados</strong> —planes de cursada, informes, cartas— que el modelo
+      <em>no podría escribir sin ese conocimiento privado</em>.</p></div>
+    <p>La idea central: el modelo de lenguaje no conoce <strong>tus</strong> notas ni el régimen de
+      correlatividades de la UTN. Son datos privados y de nicho. Le damos acceso a ellos con la
+      técnica <strong>RAG</strong> y entonces puede generar respuestas concretas y ancladas en datos
+      reales. El RAG no es un adorno del trabajo: es su corazón.</p>
+  </section>
+
+  <!-- 2 · EL PROBLEMA / REENCUADRE -->
+  <section>
+    <h2><span class="n">02</span>El problema y por qué no es trivial</h2>
+    <p>Usamos <strong>dos bases de datos</strong>, cada una para lo que sirve. Lo <strong>tabular</strong>
+      (notas, años, correlatividades) vive en una base <strong>relacional</strong>, donde un
+      <code>SELECT</code> hace búsquedas exactas. Eso está bien y lo aprovechamos tal cual: es la mitad
+      correcta del problema. Pero el producto no es esa consulta.</p>
+    <p>El producto es lo que <strong>generamos encima</strong> de esos datos: texto nuevo, redactado,
+      con razonamiento y estilo. Un SQL te dice qué materias <em>podés</em> cursar; nuestro sistema
+      redacta qué te <em>conviene</em> y por qué. Por eso tampoco es un chatbot de preguntas ni
+      NotebookLM: la gracia del TP es que el pipeline RAG lo <strong>construimos nosotros</strong> y
+      lo mostramos funcionando.</p>
+    <div class="callout"><div class="h">Cómo responde a la cátedra</div>
+      <p style="margin:0;max-width:none">La cátedra pidió dos cosas: (1) que el foco sea lo
+        <strong>generativo</strong> —generar lo que el modelo no puede solo— y (2) que combinemos
+        <strong>base relacional + vectorial</strong>, sin meter lo tabular en la vectorial. El trabajo
+        hace exactamente las dos. La arquitectura híbrida es la respuesta directa a esa indicación.</p></div>
+  </section>
+
+  <!-- 3 · CONCEPTOS Y TERMINOLOGÍA -->
+  <section>
+    <h2><span class="n">03</span>Conceptos y terminología (glosario mínimo)</h2>
+    <table>
+      <tr><th style="width:170px">Término</th><th>Qué es, en una línea</th></tr>
+      <tr><td class="term">RAG</td><td><em>Retrieval-Augmented Generation</em>. En vez de confiar en la memoria del modelo, <strong>recuperamos</strong> el contexto justo (de nuestras bases) y se lo damos para que <strong>genere</strong> anclado en él.</td></tr>
+      <tr><td class="term">Embedding</td><td>Un texto convertido en un vector de números que captura su <strong>significado</strong>. Textos parecidos → vectores cercanos. Permite buscar por sentido, no por palabra exacta.</td></tr>
+      <tr><td class="term">Base vectorial<br>(Chroma)</td><td>Almacena los embeddings de la <strong>prosa</strong> del plan. Busca por <strong>similitud semántica</strong> (lo que un <code>SELECT</code> no puede). Modelo de embeddings: MiniLM, local y offline.</td></tr>
+      <tr><td class="term">Base relacional<br>(SQLite)</td><td>Guarda lo <strong>tabular</strong> (alumno, materia, nota, año, correlativas). Se consulta con <strong>SQL exacto</strong>: lookups y joins, sin ambigüedad.</td></tr>
+      <tr><td class="term">Persistencia<br>híbrida</td><td>La decisión de arquitectura clave: <strong>cada dato en su base</strong> (tabular→relacional, texto→vectorial). No mezclar.</td></tr>
+      <tr><td class="term">Retrieval<br>híbrido</td><td>Para responder, recuperamos de <strong>las dos bases a la vez</strong> y armamos un solo contexto: SQL ancla las notas reales, los embeddings traen la documentación del plan.</td></tr>
+      <tr><td class="term">Grounding</td><td>Cuánto de la respuesta está <strong>anclada</strong> en el contexto recuperado (y no inventada). Lo medimos <em>léxico</em> (palabras en común) y <em>semántico</em> (similitud de significado).</td></tr>
+      <tr><td class="term">Precisión<br>factual</td><td>De los pares (materia, nota) que el modelo afirma, qué fracción <strong>coincide con el registro real</strong>. Mide acierto, no parecido.</td></tr>
+      <tr><td class="term">Faithfulness</td><td>Un LLM actúa de <strong>juez</strong> y puntúa 0–1 cuánto se apoya la respuesta solo en el contexto. (<em>LLM-as-judge</em>.)</td></tr>
+      <tr><td class="term">Hit-rate / MRR</td><td>Calidad del <strong>retriever</strong> solo: si la ficha correcta aparece entre los primeros resultados (hit-rate@k) y en qué posición (MRR = 1/rango promedio).</td></tr>
+      <tr><td class="term">t-SNE</td><td>Técnica para <strong>proyectar</strong> vectores de muchas dimensiones a 2D y verlos. La usamos para mostrar que materias de la misma área quedan juntas.</td></tr>
+      <tr><td class="term">KMeans / PCA</td><td>Clustering (agrupar) de perfiles de los integrantes por fortalezas + proyección a 2D para visualizar.</td></tr>
+      <tr><td class="term">Tono</td><td>Mismo dato, distinto registro de redacción (técnico / motivacional / honesto). Es lo que hace al sistema <strong>generativo</strong> y no un reporte fijo.</td></tr>
+      <tr><td class="term">Ollama</td><td>El motor que corre el LLM <strong>local</strong>. Lo usamos con el modelo <code>qwen2.5:14b</code> en GPU (o <code>phi4-mini</code> en CPU).</td></tr>
+    </table>
+  </section>
+
+  <!-- 4 · ARQUITECTURA -->
+  <section>
+    <h2><span class="n">04</span>Cómo funciona — la arquitectura</h2>
+    <div class="diagram">
+      <svg viewBox="0 0 820 150" font-family="Inter">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0 0 L10 5 L0 10 z" fill="#7C8AA5"/>
+          </marker>
+        </defs>
+        <!-- PDFs -->
+        <rect x="6" y="58" width="92" height="34" rx="7" fill="#F2F3F6" stroke="#E6E7EB"/>
+        <text x="52" y="73" text-anchor="middle" font-size="11" font-weight="600" fill="#0E0F12">PDFs reales</text>
+        <text x="52" y="85" text-anchor="middle" font-size="8.5" fill="#5B6066">notas · plan · ord.</text>
+        <line x1="98" y1="75" x2="132" y2="75" stroke="#7C8AA5" stroke-width="1.5" marker-end="url(#ar)"/>
+        <!-- pdfplumber -->
+        <rect x="132" y="58" width="86" height="34" rx="7" fill="#fff" stroke="#E6E7EB"/>
+        <text x="175" y="73" text-anchor="middle" font-size="10" font-weight="600" fill="#0E0F12">pdfplumber</text>
+        <text x="175" y="85" text-anchor="middle" font-size="8.5" fill="#5B6066">→ documentos</text>
+        <!-- split -->
+        <line x1="218" y1="75" x2="250" y2="48" stroke="#7C8AA5" stroke-width="1.5" marker-end="url(#ar)"/>
+        <line x1="218" y1="75" x2="250" y2="104" stroke="#7C8AA5" stroke-width="1.5" marker-end="url(#ar)"/>
+        <!-- relacional -->
+        <rect x="250" y="24" width="170" height="40" rx="7" fill="#E7EBFF" stroke="#3A5BFF"/>
+        <text x="335" y="40" text-anchor="middle" font-size="10.5" font-weight="600" fill="#2440D8">SQLite — relacional</text>
+        <text x="335" y="54" text-anchor="middle" font-size="8.5" fill="#2440D8">tabular: notas, correlativas</text>
+        <!-- vectorial -->
+        <rect x="250" y="86" width="170" height="40" rx="7" fill="#F2F3F6" stroke="#00A6A6"/>
+        <text x="335" y="102" text-anchor="middle" font-size="10.5" font-weight="600" fill="#00807f">Chroma — vectorial</text>
+        <text x="335" y="116" text-anchor="middle" font-size="8.5" fill="#00807f">prosa: plan (MiniLM)</text>
+        <!-- retrieval -->
+        <line x1="420" y1="44" x2="452" y2="68" stroke="#7C8AA5" stroke-width="1.5" marker-end="url(#ar)"/>
+        <line x1="420" y1="106" x2="452" y2="82" stroke="#7C8AA5" stroke-width="1.5" marker-end="url(#ar)"/>
+        <rect x="452" y="56" width="118" height="38" rx="7" fill="#fff" stroke="#E6E7EB"/>
+        <text x="511" y="71" text-anchor="middle" font-size="10" font-weight="600" fill="#0E0F12">retrieval híbrido</text>
+        <text x="511" y="84" text-anchor="middle" font-size="8.5" fill="#5B6066">SQL + semántico</text>
+        <line x1="570" y1="75" x2="602" y2="75" stroke="#7C8AA5" stroke-width="1.5" marker-end="url(#ar)"/>
+        <!-- LLM -->
+        <rect x="602" y="56" width="104" height="38" rx="7" fill="#0E0F12"/>
+        <text x="654" y="71" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">qwen2.5 (Ollama)</text>
+        <text x="654" y="84" text-anchor="middle" font-size="8.5" fill="#9AA0AA">GPU Colab / local</text>
+        <line x1="706" y1="75" x2="738" y2="75" stroke="#7C8AA5" stroke-width="1.5" marker-end="url(#ar)"/>
+        <!-- artefacto -->
+        <rect x="738" y="56" width="78" height="38" rx="7" fill="#E7EBFF" stroke="#3A5BFF"/>
+        <text x="777" y="71" text-anchor="middle" font-size="10" font-weight="600" fill="#2440D8">artefacto</text>
+        <text x="777" y="84" text-anchor="middle" font-size="8.5" fill="#2440D8">generado</text>
+      </svg>
+      <div class="cap">Pipeline RAG híbrido: del PDF crudo al documento generado. Todo corre local; solo la generación del LLM puede ir a la GPU gratuita de Colab.</div>
+    </div>
+    <p>Los PDF se parsean a texto y se reparten: lo <strong>tabular</strong> va a SQLite, la
+      <strong>prosa</strong> se vectoriza con MiniLM y va a Chroma. Ante un pedido, el retrieval
+      <strong>combina ambas</strong> en un solo contexto y el LLM genera anclado en él. Si Ollama está
+      apagado, la parte RAG funciona igual y devuelve el contexto recuperado (modo solo-retrieval).</p>
+    <h3>Por qué híbrido y no todo en la vectorial</h3>
+    <p>Meter las notas en la base vectorial sería usar <strong>búsqueda aproximada</strong> para algo
+      que es un <strong>lookup exacto</strong>: un riesgo de inventar notas. La relacional garantiza
+      cero invención de datos; la vectorial aporta el lenguaje del plan. Separarlas es deliberado.</p>
+  </section>
+
+  <!-- 5 · CÓMO SE HIZO + STACK -->
+  <section>
+    <h2><span class="n">05</span>Cómo se construyó y con qué</h2>
+    <p>El pipeline se armó en <strong>módulos independientes</strong>, cada uno con sus propios
+      chequeos (self-checks). El flujo sigue el pipeline de Ciencia de Datos completo: ingesta →
+      preprocesamiento → persistencia → análisis/visualización → generación → evaluación.</p>
+    <table>
+      <tr><th style="width:150px">Módulo</th><th>Qué hace</th></tr>
+      <tr><td class="term">extract.py</td><td>PDF → texto (pdfplumber).</td></tr>
+      <tr><td class="term">documents.py</td><td>Texto → documentos + correlatividades. <code>normalizar()</code> = clave de join entre estado y plan.</td></tr>
+      <tr><td class="term">db.py</td><td>Datos tabulares → SQLite. Consultas SQL (aprobadas, correlativas, registro real).</td></tr>
+      <tr><td class="term">ingest.py</td><td>Prosa + fichas de materia → Chroma. <code>buscar()</code> semántico.</td></tr>
+      <tr><td class="term">rag.py</td><td>Retrieval híbrido (SQL + vector) → LLM vía Ollama. Fallback si está apagado.</td></tr>
+      <tr><td class="term">generar.py</td><td>Los 6 generadores de artefactos con control de tono.</td></tr>
+      <tr><td class="term">analisis.py / figuras.py</td><td>EDA, perfil por área, radar, clustering (KMeans/PCA), t-SNE.</td></tr>
+      <tr><td class="term">evaluar.py</td><td>Grounding léxico+semántico, precisión factual, faithfulness, demo con/sin RAG.</td></tr>
+    </table>
+    <p style="margin-top:6px"><span class="chip">pdfplumber</span><span class="chip">sqlite3</span>
+      <span class="chip">chromadb</span><span class="chip">all-MiniLM-L6-v2</span>
+      <span class="chip">pandas</span><span class="chip">scikit-learn</span><span class="chip">matplotlib</span>
+      <span class="chip">Ollama · qwen2.5:14b</span><span class="chip">FastAPI (web app)</span></p>
+    <div class="callout"><div class="h">Arquitectura de ejecución</div>
+      <p style="margin:0;max-width:none">Todo el pipeline corre <strong>local y offline</strong>. Lo
+        único que puede cambiar de lugar es la generación del LLM: <code>rag.py</code> habla con Ollama
+        por HTTP, así que el modelo puede correr en la PC (CPU) o en una <strong>GPU T4 gratuita de
+        Colab</strong> por un túnel. Los datos nunca pasan por un proveedor externo: la privacidad se
+        mantiene.</p></div>
+  </section>
+
+  <!-- 6 · ARTEFACTOS -->
+  <section>
+    <h2><span class="n">06</span>Los 6 artefactos generados</h2>
+    <table>
+      <tr><th style="width:185px">Artefacto</th><th>Qué genera</th></tr>
+      <tr><td class="term">Plan de cursada</td><td>Qué materias cursar el próximo cuatrimestre, priorizadas y justificadas (combina correlativas + fortalezas + contenidos).</td></tr>
+      <tr><td class="term">Informe de trayectoria</td><td>Relato en prosa de la evolución académica: fortalezas, debilidades, consejo final.</td></tr>
+      <tr><td class="term">Carta de pasantía</td><td>Carta de presentación en primera persona, conectando fortalezas reales con el puesto.</td></tr>
+      <tr><td class="term">Recomendar orientación</td><td>Hacia qué especialización conviene perfilarse, según el promedio por área real.</td></tr>
+      <tr><td class="term">Diagnóstico grupal</td><td>Reparte roles de un proyecto entre los 6 según sus fortalezas (usa el clustering).</td></tr>
+      <tr><td class="term">Simulación what-if</td><td>Proyecta el promedio si se aprueban ciertas materias con ciertas notas.</td></tr>
+    </table>
+    <p>Todos comparten una regla de prompting: el modelo usa <strong>solo</strong> el contexto
+      recuperado, tiene prohibido inventar, pero debe <strong>interpretar y seleccionar</strong> (no
+      recitar todas las notas). Sobre eso se aplica el <strong>tono</strong>.</p>
+  </section>
+
+  <!-- 7 · EVALUACIÓN -->
+  <section>
+    <h2><span class="n">07</span>Evaluación y resultados</h2>
+    <p>La pregunta que medimos: <strong>¿cuánto del contexto usa el modelo, y cuánto inventa?</strong>
+      La <strong>demo estrella</strong> corre el mismo pedido <em>con RAG</em> (contexto real) vs
+      <em>sin RAG</em> (sin contexto). Promediando 4 artefactos con qwen2.5:14b:</p>
+    <div class="kpis">
+      <div class="kpi"><b>1.0</b><span>precisión factual con RAG (cero notas inventadas)</span></div>
+      <div class="kpi"><b>0.75 / 0.25</b><span>faithfulness (juez LLM) con / sin RAG</span></div>
+      <div class="kpi"><b>0.69 / 0.22</b><span>grounding léxico con / sin RAG</span></div>
+      <div class="kpi"><b>0.60 / 0.53</b><span>grounding semántico con / sin RAG</span></div>
+    </div>
+    <p>En las 4 métricas, <strong>con RAG &gt; sin RAG</strong>: evidencia medible de que el
+      conocimiento privado es el corazón del producto. Honestidad metodológica: la generación es
+      estocástica, así que el valor absoluto de una corrida varía; lo robusto es la <strong>dirección</strong>
+      (siempre con&gt;sin) y la precisión factual.</p>
+    <h3>Calidad del retriever (recuperación sola, sin LLM)</h3>
+    <p>Aparte medimos solo la recuperación con <strong>hit-rate</strong> y <strong>MRR</strong> sobre
+      12 consultas-tema: <strong>hit-rate@1 = 0.92 · MRR = 0.92</strong>. Estos números mejoraron limpiando el
+      texto que se vectoriza (sacar el boilerplate que las 36 fichas repetían y dejar solo nombre +
+      contenidos mínimos): mejor preprocesamiento, no truco. Validamos además que un embedder
+      multilingüe (e5-large) lleva la recuperación a <strong>1.00 perfecto</strong>; quedó como opción
+      por su peso (2.2&nbsp;GB) frente al MiniLM liviano del default.</p>
+  </section>
+
+  <!-- 8 · ENTREGABLES -->
+  <section>
+    <h2><span class="n">08</span>Entregables del trabajo</h2>
+    <ul>
+      <li><strong>Notebook de Colab</strong> — el end-to-end de todo el pipeline, ejecutable de punta a punta (pide el <code>.zip</code> y descomprime solo).</li>
+      <li><strong>Web app</strong> — consola en vivo de la demo con/sin RAG; terceriza la generación a la GPU de Colab.</li>
+      <li><strong>Informe técnico</strong> — el documento formal con los 5 apartados.</li>
+      <li><strong>Presentación</strong> (slides) + <strong>este guión</strong> seccionado por integrante.</li>
+      <li><strong>.zip de entrega</strong> — todo lo necesario para correr el notebook en Colab.</li>
+    </ul>
+  </section>
+
+  <!-- 9 · MAPA DE LA EXPOSICIÓN -->
+  <section>
+    <h2><span class="n">09</span>Mapa de la exposición — quién dice qué</h2>
+    <table>
+      <tr><th style="width:150px">Turno</th><th>Tema</th><th style="width:110px">Slides</th></tr>
+      <tr><td class="term">1 · Tomás</td><td>Apertura + el problema (generar, no consultar)</td><td>1–2</td></tr>
+      <tr><td class="term">2 · Mora</td><td>Datos, corpus mixto y EDA (por qué dos bases)</td><td>3</td></tr>
+      <tr><td class="term">3 · Santiago</td><td>Pipeline RAG + espacio semántico (embeddings, t-SNE)</td><td>4–5</td></tr>
+      <tr><td class="term">4 · Juan Bautista</td><td>Generación, prompting y los 3 tonos</td><td>6</td></tr>
+      <tr><td class="term">5 · Simón</td><td>Demo con/sin RAG + evaluación (métricas)</td><td>7–8</td></tr>
+      <tr><td class="term">6 · Lautaro</td><td>Diagnóstico grupal + conclusiones</td><td>9–10</td></tr>
+    </table>
+    <p style="font-size:9.6pt;color:var(--ink-soft)">Reparto de preguntas: pipeline técnico → Santiago ·
+      datos → Mora · evaluación → Simón. El guión completo (<code>guion/</code>) trae el speech y las
+      "claves si te preguntan" de cada uno.</p>
+  </section>
+
+  <!-- 10 · PREGUNTAS DEL JURADO -->
+  <section>
+    <h2><span class="n">10</span>Preguntas probables del jurado</h2>
+    <table>
+      <tr><th style="width:230px">Si preguntan…</th><th>Respuesta corta</th></tr>
+      <tr><td>"¿Esto no lo hace un SQL?"</td><td>El SQL resuelve el lookup exacto, y por eso lo tabular va en la relacional. Pero el producto es el <strong>texto generado</strong> encima (plan, carta), que un SQL no redacta.</td></tr>
+      <tr><td>"¿Por qué dos bases de datos?"</td><td>Cada dato en la que le corresponde: tabular → relacional (exacto), prosa → vectorial (semántico). El agente combina ambas. Es la indicación de la cátedra.</td></tr>
+      <tr><td>"¿Qué es el grounding?"</td><td>Cuánto de la salida está anclada en el contexto recuperado. Lo medimos léxico y semántico, más precisión factual y faithfulness.</td></tr>
+      <tr><td>"¿Cómo evitan que invente notas?"</td><td>El system prompt obliga a usar solo el contexto; la relacional ancla las notas exactas. Medido: precisión factual 1.0 con RAG.</td></tr>
+      <tr><td>"¿Y la lematización / limpieza de texto?"</td><td>Con embeddings sub-palabra (MiniLM) no hace falta lematizar; la limpieza relevante es el chunking de la prosa y la normalización de nombres para el join.</td></tr>
+      <tr><td>"¿Corre sin internet / es privado?"</td><td>Sí, todo local y offline. Solo la generación puede ir a la GPU de Colab; los datos no pasan por terceros.</td></tr>
+      <tr><td>"¿Los datos son reales?"</td><td>Sí: notas e historiales reales de los 6 integrantes (parseados de PDFs del campus). Los perfiles nunca son inventados.</td></tr>
+    </table>
+  </section>
+
+</article>
+</body>
+</html>

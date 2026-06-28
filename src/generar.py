@@ -143,12 +143,12 @@ def _doc_plan(consulta: str, k: int = 2) -> str:
 
 
 def _excerpt(texto: str, n: int = 300) -> str:
-    """Extracto de la sección 'Contenidos mínimos' de la ficha (los temas), no el encabezado.
+    """Extracto de la sección 'Contenidos mínimos' de la ficha (los temas), no el nombre.
 
-    El offset 60 saltea mi línea-prefijo ('...contenidos mínimos de la materia X...') para tomar
-    la sección real de contenidos más abajo en la página; si no aparece, usa el cuerpo de la ficha.
+    La ficha vectorizada es '{nombre}. Contenidos mínimos - ...' (ver documents._solo_contenidos):
+    saltamos el nombre del frente y tomamos desde 'Contenidos m'; si no aparece, usa el cuerpo.
     """
-    i = texto.find("Contenidos m", 60)
+    i = texto.find("Contenidos m", 0)
     seg = texto[i:] if i > 0 else texto.split("\n", 1)[-1]
     return " ".join(seg.split())[:n]
 

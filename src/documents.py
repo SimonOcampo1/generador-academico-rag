@@ -253,6 +253,23 @@ ORDENANZA = "SistemasOrdenanza1877.pdf"
 _ORDEN = re.compile(r"orden:\s*(\d+)", re.IGNORECASE)
 
 
+def _solo_contenidos(pagina: str) -> str:
+    """Extrae la sección 'Contenidos mínimos' de la página de la ficha, sin el ruido de alrededor.
+
+    La página del PDF trae una tabla de metadatos repetida en las 36 fichas (Carrera, Departamento,
+    Horas, Bloque, Competencias, códigos RTF…) + objetivos. Ese boilerplate es casi idéntico entre
+    materias, así que al vectorizarlo ACERCA todas las fichas entre sí y arruina la discriminación
+    del retrieval. Nos quedamos solo con los contenidos mínimos (los temas), que es lo que distingue
+    una materia de otra. Medido: pasar de la página entera a esta sección sube el hit-rate@1 del
+    retriever de 0.50 a 0.92 sobre el gold set (ver scripts/eval_retriever.py).
+    """
+    i = pagina.find("Contenidos m", 40)  # >40: saltea el 'contenidos mínimos' del encabezado
+    seg = pagina[i:] if i > 0 else pagina.split("\n", 1)[-1]
+    seg = re.sub(r"\s+", " ", seg)
+    seg = re.sub(r"\bN[º°]?\s*de orden.*$", "", seg)  # corta si entró el encabezado de la siguiente
+    return seg.strip()[:600]
+
+
 def documentos_ordenanza(plan_corr: dict[int, dict]) -> list[dict]:
     """Ordenanza 1877 -> documentos para la base vectorial.
 
@@ -276,11 +293,12 @@ def documentos_ordenanza(plan_corr: dict[int, dict]) -> list[dict]:
         if m and int(m.group(1)) in nombre_de:
             n = int(m.group(1))
             nombre = nombre_de[n]
+            # El texto vectorizado es NOMBRE + sus contenidos mínimos, sin el preámbulo repetido ni
+            # la tabla de metadatos del PDF: maximiza la separación entre fichas en el espacio de
+            # embeddings (ver _solo_contenidos). El nombre va al frente porque es discriminativo.
             docs.append({
                 "id": f"contenidos-{n:02d}",
-                "text": (f"Descripción y contenidos mínimos de la materia '{nombre}' "
-                         f"(asignatura Nº {n} del Plan 2023 de Ingeniería en Sistemas de "
-                         f"Información):\n{limpio}"),
+                "text": f"{nombre}. {_solo_contenidos(limpio)}",
                 "metadata": {"fuente": "contenidos_materia", "materia": nombre, "num_plan": n},
             })
         else:

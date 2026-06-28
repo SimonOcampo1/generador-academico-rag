@@ -136,7 +136,11 @@
       cuyo nombre se parte en dos líneas. El parseo produce 549 registros que se reparten entre las
       dos bases: <b>413 filas a la relacional</b> (377 de estados académicos + 36 de
       correlatividades) y <b>136 documentos a la vectorial</b> (100 chunks de prosa del diseño
-      curricular + 36 fichas de materia con sus contenidos mínimos, del Anexo de la Ord. 1877).</p>
+      curricular + 36 fichas de materia con sus contenidos mínimos, del Anexo de la Ord. 1877).
+      No se aplicó lematización ni stemming clásicos sobre la prosa: el texto del plan se indexa con
+      <b>embeddings de MiniLM</b>, que operan a nivel sub-palabra, así que el preprocesamiento que sí
+      importa no es morfológico sino el <i>chunking</i> de la prosa y la normalización de nombres para
+      el join.</p>
     <p>El historial de notas de exámenes usa los nombres del <b>Plan 2008</b>, mientras que el
       estado académico ya migró a los del <b>Plan 2023</b>. Para que el cruce no pierda notas
       aprobadas por equivalencia, incorporamos el <b>Anexo II</b> del plan (régimen de
@@ -155,7 +159,7 @@
       aparecen al desagregar por área temática, que es lo que explota el diagnóstico grupal.</p>
     <figure>
       <img src="../figs/notas_distribucion.png" alt="Distribución de notas por integrante">
-      <figcaption>Fig. 1 — Distribución de notas por integrante (datos reales de los seis): promedios entre 7.9 y 8.7.</figcaption>
+      <figcaption>Fig. 1 — Distribución de notas por integrante (datos reales de los seis): promedios entre 8.0 y 8.7.</figcaption>
     </figure>
     <figure>
       <img src="../figs/avance_anual.png" alt="Avance académico por año">
@@ -257,9 +261,10 @@ evaluar.py    grounding léxico + semántico + comparar_con_sin_rag()</pre>
     <p>La <b>demo estrella</b> compara el mismo pedido <b>con RAG</b> (contexto real) contra
       <b>sin RAG</b> (sin contexto). Promediando cuatro artefactos (plan de cursada, recomendación de
       orientación, informe de trayectoria y carta de pasantía) con <b>qwen2.5:14B</b>, el resultado
-      más nítido es la <b>precisión factual</b>: con RAG es <b>1.0</b> &mdash;de cada par (materia,
-      nota) que el modelo afirma, el 100% coincide con el registro real: cero notas inventadas&mdash;
-      mientras que sin RAG el modelo no cita ningún dato verificable. La <b>faithfulness</b> juzgada
+      más contundente es la <b>precisión factual</b>: sobre los artefactos que llegan a afirmar pares
+      (materia, nota) verificables &mdash;en esta corrida, la carta de pasantía&mdash;, con RAG es
+      <b>1.0</b> (el 100% de los pares coincide con el registro real: cero notas inventadas), mientras
+      que sin RAG el modelo no afirma ningún dato verificable. La <b>faithfulness</b> juzgada
       por el LLM cae de <b>0.75 con RAG a 0.25 sin RAG</b>, y el grounding de <b>0.69 a 0.22</b>
       (léxico) y <b>0.60 a 0.53</b> (semántico). En las cuatro métricas, con RAG &gt; sin RAG: la
       evidencia medible de que el conocimiento privado es el corazón del producto, no un adorno.</p>
@@ -273,8 +278,27 @@ evaluar.py    grounding léxico + semántico + comparar_con_sin_rag()</pre>
       lo robusto es la <b>dirección</b> (con RAG &gt; sin RAG en las cuatro métricas) y la precisión
       factual de 1.0. Limitación de fondo: ninguna métrica detecta <i>contradicciones</i> lógicas
       sutiles, solo cercanía, corrección de pares y un juicio agregado.</p>
+    <h3>Calidad del retriever (recuperación, sin LLM)</h3>
+    <p>Las métricas anteriores evalúan la generación; por separado medimos la <b>recuperación</b>
+      sola. Sobre 12 consultas-tema redactadas <i>sin</i> nombrar la materia &mdash;para forzar el
+      match semántico y no léxico&mdash; se verifica si la ficha de la materia esperada aparece en el
+      top-5 de la base vectorial: <b>hit-rate@1 = 0.92</b>, <b>hit-rate@3 = 0.92</b> y <b>MRR = 0.92</b>.
+      Estos números son fruto de una <b>decisión de preprocesamiento medida</b>: la ficha que se
+      vectoriza contiene solo el <i>nombre</i> de la materia y sus <i>contenidos mínimos</i>, y descarta
+      el preámbulo y la tabla de metadatos (carga horaria, bloque, competencias) que el PDF repite casi
+      idéntica en las 36 fichas. Ese boilerplate compartido acercaba todas las fichas entre sí en el
+      espacio de embeddings; quitarlo subió el hit-rate@1 de <b>0.50 a 0.92</b> y el MRR de
+      <b>0.68 a 0.92</b>. El único fallo restante &mdash;una consulta sobre &laquo;modelo relacional&raquo;
+      que no trae &laquo;Bases de Datos&raquo; al top-5, aun cuando su ficha sí menciona el modelo
+      relacional&mdash; expone el límite del <i>embedder</i> por defecto (MiniLM, chico y centrado en
+      inglés) sobre vocabulario técnico en español. <b>Lo verificamos:</b> al reemplazar el embedder por
+      uno multilingüe (<i>multilingual-e5-large</i>), la recuperación sube a <b>hit-rate@1 = 1.00 y
+      MRR = 1.00</b> &mdash;las 12 consultas, «Bases de Datos» incluida, recuperan la ficha correcta en
+      primer lugar&mdash;. Mantenemos MiniLM como <i>default</i> por su huella liviana y offline
+      (≈90&nbsp;MB frente a 2,2&nbsp;GB); el multilingüe queda como mejora opcional ya validada, no como
+      una promesa.</p>
     <div class="kpis">
-      <div class="kpi"><b>1.0</b><span>precisión factual CON RAG (pares materia-nota correctos)</span></div>
+      <div class="kpi"><b>1.0</b><span>precisión factual CON RAG: pares (materia, nota) correctos (carta de pasantía)</span></div>
       <div class="kpi"><b>0.75<span style="font-size:18px;color:var(--ink-soft)"> / 0.25</span></b><span>faithfulness (juez LLM) con / sin RAG</span></div>
       <div class="kpi"><b>0.69<span style="font-size:18px;color:var(--ink-soft)"> / 0.22</span></b><span>grounding léxico con / sin RAG</span></div>
       <div class="kpi"><b>0.60<span style="font-size:18px;color:var(--ink-soft)"> / 0.53</span></b><span>grounding semántico con / sin RAG</span></div>
@@ -300,10 +324,13 @@ evaluar.py    grounding léxico + semántico + comparar_con_sin_rag()</pre>
       matices imprecisos que solo una verificación de consistencia detectaría.</p>
     <h3>Trabajo futuro</h3>
     <p>Sumar las descripciones de las electivas (no detalladas en la ordenanza) para recomendarlas
-      por contenido como ya se hace con las obligatorias; reforzar la evaluación con métricas de RAG más finas
-      &mdash;<i>faithfulness</i> y <i>answer/context relevancy</i> con un LLM como juez, o precisión
-      de recuperación (hit-rate / MRR) sobre el retriever&mdash; que capturen consistencia y no solo
-      cercanía léxica; y consolidar la arquitectura híbrida (modelo grande en GPU para la demo, base
+      por contenido como ya se hace con las obligatorias; extender la evaluación del retriever
+      &mdash;hoy con <i>hit-rate</i> y <i>MRR</i> sobre un gold set de 12 consultas&mdash; a un conjunto
+      mayor, sumar <i>answer/context relevancy</i> con un LLM como juez y una verificación de
+      consistencia lógica que ninguna métrica actual captura, e <b>integrar opcionalmente el embedder
+      multilingüe</b> (e5-large, ya validado con recuperación perfecta) detrás de una bandera de
+      configuración, para no imponer su descarga de 2,2&nbsp;GB en el camino por defecto; y consolidar
+      la arquitectura híbrida (modelo grande en GPU para la demo, base
       local reproducible para producción).</p>
     <p class="muted" style="margin-top:var(--s4)">El código, el notebook integrador y la web app
       de demostración en vivo acompañan este informe como entregables ejecutables.</p>
