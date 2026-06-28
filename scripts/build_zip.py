@@ -27,8 +27,8 @@ OUT = ROOT.parent / "Entrega-Grupo14-GeneradorAcademico.zip"
 
 def archivos() -> list[Path]:
     fijos = ["notebook.ipynb", "requirements.txt", "README.md", "INSTRUCCIONES.txt",
-             "data/eval_resultados.json", "data/eval_retriever.json",
-             "scripts/run_eval.py", "scripts/eval_retriever.py"]
+             "data/eval_resultados.json", "data/eval_retriever.json", "data/eval_retriever_e5.json",
+             "scripts/run_eval.py", "scripts/eval_retriever.py", "scripts/eval_retriever_e5.py"]
     paths = [ROOT / f for f in fijos]
     paths += sorted(ROOT.glob("src/*.py"))
     paths += sorted((ROOT / "data" / "raw").glob("*.pdf"))
