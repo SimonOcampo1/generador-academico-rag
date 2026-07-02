@@ -1,0 +1,23 @@
+GENERADOR ACADÉMICO (RAG) — TP Integrador de Ciencia de Datos
+UTN FRLP · Ingeniería en Sistemas de Información · Grupo 14 · 2026
+
+REPOSITORIO
+https://github.com/SimonOcampo1/generador-academico-rag
+
+PROPUESTA
+Sistema de IA generativa con persistencia híbrida que combina una base
+relacional (SQLite) —historial académico real del grupo: notas, materias, años
+y correlatividades del plan— con una base vectorial (Chroma) que guarda la
+documentación de la carrera. A partir de ambas, un pipeline RAG propio
+(parseo de PDFs → persistencia híbrida → retrieval combinado → generación con
+un LLM vía Ollama) genera artefactos académicos personalizados —planes de
+cursada, informes de trayectoria y recomendaciones de electivas— anclados en
+ese conocimiento privado que el modelo no podría producir por sí solo.
+
+INTEGRANTES
+- Simón Tadeo Ocampo
+- Santiago Natalichio Bestosini
+- Lautaro Antuel Aubert
+- Mora Gentil
+- Juan Bautista Cuenca
+- Tomás Martín
