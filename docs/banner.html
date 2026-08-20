@@ -135,6 +135,10 @@ h1{
   letter-spacing:.26em;text-transform:uppercase;
   color:color-mix(in srgb, var(--muted) 62%, transparent);
 }
+
+/* El social preview (2:1) se recorta en las tarjetas: GitHub pide ~80px de zona
+   segura. El banner del README (3:1) no se recorta y conserva su composicion. */
+@media (max-aspect-ratio: 5/2){ .footnote{bottom:15%} }
 </style>
 </head>
 <body>
